@@ -134,21 +134,35 @@ const CUSTOMER_FIELDS =
   "webpage,isprosp,prjcs,phone01,phone02,email,emailacc,address,zip," +
   "city,country,insdate,upddate";
 
+/**
+ * Call s1Fetch with automatic re-auth on session-expired error codes
+ * (-100 / -101). The body factory resolves the current clientID at send time.
+ */
+async function s1FetchWithRetry(
+  buildBody: (clientId: string) => Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  let session = await getSession();
+  let res = await s1Fetch<Record<string, unknown>>(buildBody(session.clientID));
+  const code = Number(res.errorcode ?? res.errorCode ?? 0);
+  if (!res.success && (code === -100 || code === -101)) {
+    console.log("[softone] session expired, re-authenticating...");
+    clearSession();
+    session = await authenticate();
+    res = await s1Fetch<Record<string, unknown>>(buildBody(session.clientID));
+  }
+  return res;
+}
+
 async function getTableRows(filter: string): Promise<Record<string, unknown>[]> {
-  const session = await getSession();
-  const req = {
-    clientId: session.clientID,
+  const res = await s1FetchWithRetry((clientId) => ({
+    clientId,
     appId: Number(APP_ID),
     version: "1",
     service: "GetTable",
     TABLE: "trdr",
     FIELDS: CUSTOMER_FIELDS,
     FILTER: filter,
-  };
-  console.log("[softone] GetTable request:", { ...req, clientID: `${session.clientID.slice(0, 6)}…` });
-
-  const res = await s1Fetch<Record<string, unknown>>(req);
-  console.log("[softone] GetTable keys:", Object.keys(res), "sample:", JSON.stringify(res).slice(0, 600));
+  }));
 
   if (!res.success) {
     throw new Error(`SoftOne GetTable failed: ${res.error ?? JSON.stringify(res)}`);
@@ -199,17 +213,15 @@ export async function s1GetTable<T extends Record<string, unknown>>(opts: {
   filter: string;
   mapRow?: (r: Record<string, unknown>) => T;
 }): Promise<T[]> {
-  const session = await getSession();
-  const req = {
-    clientId: session.clientID,
+  const res = await s1FetchWithRetry((clientId) => ({
+    clientId,
     appId: Number(APP_ID),
     version: "1",
     service: "GetTable",
     TABLE: opts.table,
     FIELDS: opts.fields,
     FILTER: opts.filter,
-  };
-  const res = await s1Fetch<Record<string, unknown>>(req);
+  }));
   if (!res.success) {
     throw new Error(`SoftOne GetTable(${opts.table}) failed: ${res.error ?? JSON.stringify(res)}`);
   }

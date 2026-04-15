@@ -3,17 +3,13 @@
 import { auth, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { SYNC_KINDS } from "./schedule-kinds";
 
 async function requireAdmin() {
   const session = await auth();
   if (!session || !isAdmin(session.user.role)) throw new Error("Forbidden");
   return session;
 }
-
-export const SYNC_KINDS = [
-  { kind: "softone-customers", label: "SoftOne · Customers (incremental)", defaultInterval: 5 },
-  { kind: "softone-countries", label: "SoftOne · Countries",               defaultInterval: 720 },
-] as const;
 
 export async function seedSchedulesAction(): Promise<void> {
   await requireAdmin();
