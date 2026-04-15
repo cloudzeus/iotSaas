@@ -113,7 +113,9 @@ export default function Topbar({
         <button
           className="btn-ghost"
           onClick={toggleTheme}
-          title={theme === "dark" ? "Light mode" : "Dark mode"}
+          title={locale === "el"
+            ? (theme === "dark" ? "Φωτεινό θέμα" : "Σκοτεινό θέμα")
+            : (theme === "dark" ? "Light mode" : "Dark mode")}
           style={{ padding: "8px" }}
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}

@@ -140,7 +140,9 @@ export default function Sidebar({ collapsed, onToggle, role, locale }: SidebarPr
             onClick={onToggle}
             className="sidebar-link btn-ghost"
             style={{ width: "100%", border: "none", cursor: "pointer", display: "flex" }}
-            title={collapsed ? "Expand" : "Collapse"}
+            title={t
+              ? (collapsed ? "Ανάπτυξη" : "Σύμπτυξη")
+              : (collapsed ? "Expand" : "Collapse")}
           >
             {collapsed ? <ChevronRight size={18} className="icon" /> : <ChevronLeft size={18} className="icon" />}
             {!collapsed && (

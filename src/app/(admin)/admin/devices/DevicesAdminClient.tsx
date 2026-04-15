@@ -120,7 +120,7 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <StatusDot online={d.connectStatus === "ONLINE"} />
                         <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                          {d.connectStatus === "ONLINE" ? "Online" : "Offline"}
+                          {d.connectStatus === "ONLINE" ? (t ? "Σε σύνδεση" : "Online") : (t ? "Εκτός" : "Offline")}
                         </span>
                       </div>
                     </td>
@@ -182,7 +182,7 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <StatusDot online={d.online} />
                         <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                          {d.online ? "Online" : "Offline"}
+                          {d.online ? (t ? "Σε σύνδεση" : "Online") : (t ? "Εκτός" : "Offline")}
                         </span>
                       </div>
                     </td>

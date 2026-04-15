@@ -138,7 +138,7 @@ export default function SyncJobsClient({ jobs, locale }: Props) {
                         />
                       </td>
                       <td style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{j.kind}</td>
-                      <td><StatusBadge status={j.status} /></td>
+                      <td><StatusBadge status={j.status} t={t} /></td>
                       <td style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                         <span className={`badge ${j.trigger === "manual" ? "badge-blue" : "badge-gray"}`}>{j.trigger}</span>
                       </td>
@@ -177,10 +177,12 @@ export default function SyncJobsClient({ jobs, locale }: Props) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === "success") return <span className="badge badge-green"><CheckCircle2 size={11} style={{ display: "inline", marginRight: 4 }} />success</span>;
-  if (status === "failed")  return <span className="badge badge-red"><XCircle size={11} style={{ display: "inline", marginRight: 4 }} />failed</span>;
-  if (status === "running") return <span className="badge badge-yellow"><Loader2 size={11} className="animate-spin" style={{ display: "inline", marginRight: 4 }} />running</span>;
+function StatusBadge({ status, t }: { status: string; t: boolean }) {
+  const label = (k: "success" | "failed" | "running") =>
+    t ? ({ success: "επιτυχία", failed: "αποτυχία", running: "εκτελείται" }[k]) : k;
+  if (status === "success") return <span className="badge badge-green"><CheckCircle2 size={11} style={{ display: "inline", marginRight: 4 }} />{label("success")}</span>;
+  if (status === "failed")  return <span className="badge badge-red"><XCircle size={11} style={{ display: "inline", marginRight: 4 }} />{label("failed")}</span>;
+  if (status === "running") return <span className="badge badge-yellow"><Loader2 size={11} className="animate-spin" style={{ display: "inline", marginRight: 4 }} />{label("running")}</span>;
   return <span className="badge badge-gray">{status}</span>;
 }
 
