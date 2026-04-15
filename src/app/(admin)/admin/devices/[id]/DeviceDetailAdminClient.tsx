@@ -107,7 +107,7 @@ export default function DeviceDetailAdminClient({ device, live, channels, compat
                   {c.channel}
                 </div>
                 <div style={{ color: "var(--text-secondary)", fontSize: "0.72rem", marginTop: 4 }}>
-                  {c.count.toLocaleString()} {t ? "δείγματα" : "samples"}
+                  {c.count.toLocaleString(t ? "el-GR" : "en-GB")} {t ? "δείγματα" : "samples"}
                   {c.unit ? ` · ${c.unit}` : ""}
                 </div>
                 {c.lastTs && (

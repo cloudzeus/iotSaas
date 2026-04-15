@@ -228,7 +228,7 @@ export default function CustomersClient({ customers, plans, total, page, pageSiz
           <Users size={22} style={{ display: "inline", marginRight: 8, color: "var(--orange)" }} />
           {t ? "Πελάτες (CRM)" : "Customers (CRM)"}
           <span style={{ marginLeft: 10, color: "var(--text-muted)", fontSize: "1rem", fontWeight: 400 }}>
-            ({total.toLocaleString()})
+            ({total.toLocaleString(t ? "el-GR" : "en-GB")})
           </span>
         </h1>
       </div>
@@ -340,8 +340,8 @@ export default function CustomersClient({ customers, plans, total, page, pageSiz
         <div className={s.footer}>
           <span>
             {pageSize === "all"
-              ? <>{customers.length.toLocaleString()} {t ? "εγγραφές" : "rows"}</>
-              : <>{t ? "Σελίδα" : "Page"} {page} / {totalPages} · {total.toLocaleString()} {t ? "εγγραφές" : "rows"}</>}
+              ? <>{customers.length.toLocaleString(t ? "el-GR" : "en-GB")} {t ? "εγγραφές" : "rows"}</>
+              : <>{t ? "Σελίδα" : "Page"} {page} / {totalPages} · {total.toLocaleString(t ? "el-GR" : "en-GB")} {t ? "εγγραφές" : "rows"}</>}
           </span>
           {pageSize !== "all" && (
             <div className={s.pager}>

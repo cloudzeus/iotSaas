@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import Providers from "@/components/ui/Providers";
 import "./globals.css";
 
@@ -19,18 +20,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                var theme = localStorage.getItem('dgsmart-theme') || 'dark';
-                document.documentElement.setAttribute('data-theme', theme);
-              })();
-            `,
-          }}
-        />
       </head>
       <body className={inter.className}>
+        <Script id="dgsmart-theme-init" strategy="beforeInteractive">
+          {`(function() {
+            try {
+              var theme = localStorage.getItem('dgsmart-theme') || 'dark';
+              document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+          })();`}
+        </Script>
         <Providers>{children}</Providers>
       </body>
     </html>

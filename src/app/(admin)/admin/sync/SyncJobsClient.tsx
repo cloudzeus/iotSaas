@@ -195,8 +195,8 @@ function JobDetail({ job, t }: { job: Job; t: boolean }) {
           {t ? "Μεταδεδομένα" : "Metadata"}
         </div>
         <Row label="Job ID" value={<code style={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{job.id}</code>} />
-        <Row label={t ? "Ξεκίνησε" : "Started"} value={new Date(job.startedAt).toLocaleString()} />
-        <Row label={t ? "Τελείωσε" : "Finished"} value={job.finishedAt ? new Date(job.finishedAt).toLocaleString() : "—"} />
+        <Row label={t ? "Ξεκίνησε" : "Started"} value={new Date(job.startedAt).toLocaleString(t ? "el-GR" : "en-GB")} />
+        <Row label={t ? "Τελείωσε" : "Finished"} value={job.finishedAt ? new Date(job.finishedAt).toLocaleString(t ? "el-GR" : "en-GB") : "—"} />
         <Row label={t ? "Διάρκεια" : "Duration"} value={job.durationMs != null ? formatDuration(job.durationMs) : "—"} />
         <Row label={t ? "Παράμετροι" : "Params"} value={<code style={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{JSON.stringify(job.params)}</code>} />
         {job.message && <Row label={t ? "Μήνυμα" : "Message"} value={<span style={{ whiteSpace: "pre-wrap", fontSize: "0.8rem" }}>{job.message}</span>} />}
