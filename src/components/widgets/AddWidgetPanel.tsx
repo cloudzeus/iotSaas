@@ -17,6 +17,7 @@ interface AddWidgetPanelProps {
   devices: Device[];
   onAdd: (type: WidgetType, title: string, config: WidgetConfig) => Promise<void>;
   onClose: () => void;
+  locale?: string;
 }
 
 interface WidgetMeta {
@@ -25,27 +26,28 @@ interface WidgetMeta {
   description: string;
 }
 
-const META: Record<WidgetType, WidgetMeta> = {
-  "gauge":           { icon: LuGauge,       color: "#ff6600", description: "Radial gauge with color thresholds" },
-  "stat-card":       { icon: FiHash,        color: "#3b82f6", description: "Large numeric value with trend" },
-  "line-chart":      { icon: FiActivity,    color: "#22c55e", description: "Time-series line chart" },
-  "area-chart":      { icon: FiTrendingUp,  color: "#8b5cf6", description: "Filled area time-series" },
-  "bar-chart":       { icon: FiBarChart2,   color: "#f59e0b", description: "Categorical bar chart" },
-  "map":             { icon: FiMap,         color: "#0ea5e9", description: "Device pins on a map" },
-  "device-grid":     { icon: FiGrid,        color: "#14b8a6", description: "Status cards per device" },
-  "telemetry-table": { icon: FiList,        color: "#64748b", description: "Tabular telemetry rows" },
-  "alert-summary":   { icon: FiBell,        color: "#ef4444", description: "Recent alerts summary" },
+const META: Record<WidgetType, WidgetMeta & { descEl: string }> = {
+  "gauge":           { icon: LuGauge,       color: "#ff6600", description: "Radial gauge with color thresholds", descEl: "Ραντάρ μέτρησης με έγχρωμα όρια" },
+  "stat-card":       { icon: FiHash,        color: "#3b82f6", description: "Large numeric value with trend",     descEl: "Μεγάλη τιμή με δείκτη τάσης" },
+  "line-chart":      { icon: FiActivity,    color: "#22c55e", description: "Time-series line chart",              descEl: "Γραμμικό διάγραμμα χρονοσειράς" },
+  "area-chart":      { icon: FiTrendingUp,  color: "#8b5cf6", description: "Filled area time-series",             descEl: "Γέμισμα χρονοσειράς (area)" },
+  "bar-chart":       { icon: FiBarChart2,   color: "#f59e0b", description: "Categorical bar chart",               descEl: "Ραβδόγραμμα" },
+  "map":             { icon: FiMap,         color: "#0ea5e9", description: "Device pins on a map",                descEl: "Συσκευές σε χάρτη" },
+  "device-grid":     { icon: FiGrid,        color: "#14b8a6", description: "Status cards per device",             descEl: "Κάρτες κατάστασης ανά συσκευή" },
+  "telemetry-table": { icon: FiList,        color: "#64748b", description: "Tabular telemetry rows",              descEl: "Πίνακας μετρήσεων" },
+  "alert-summary":   { icon: FiBell,        color: "#ef4444", description: "Recent alerts summary",               descEl: "Πρόσφατες ειδοποιήσεις" },
 };
 
-const GROUPS: { label: string; icon: React.ComponentType<{ size?: number }>; types: WidgetType[] }[] = [
-  { label: "Numeric",     icon: FiHash,       types: ["gauge", "stat-card"] },
-  { label: "Charts",      icon: FiPieChart,   types: ["line-chart", "area-chart", "bar-chart"] },
-  { label: "Spatial",     icon: FiMap,        types: ["map", "device-grid"] },
-  { label: "Data tables", icon: FiList,       types: ["telemetry-table", "alert-summary"] },
+const GROUPS: { label: string; labelEl: string; icon: React.ComponentType<{ size?: number }>; types: WidgetType[] }[] = [
+  { label: "Numeric",     labelEl: "Αριθμητικά",   icon: FiHash,     types: ["gauge", "stat-card"] },
+  { label: "Charts",      labelEl: "Γραφήματα",    icon: FiPieChart, types: ["line-chart", "area-chart", "bar-chart"] },
+  { label: "Spatial",     labelEl: "Χωρικά",       icon: FiMap,      types: ["map", "device-grid"] },
+  { label: "Data tables", labelEl: "Πίνακες",      icon: FiList,     types: ["telemetry-table", "alert-summary"] },
 ];
 
-export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose }: AddWidgetPanelProps) {
+export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose, locale = "el" }: AddWidgetPanelProps) {
   const [selectedType, setSelectedType] = useState<WidgetType | null>(null);
+  const t = locale === "el";
 
   if (selectedType) {
     return (
@@ -92,10 +94,10 @@ export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose }: A
         }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-              Add widget
+              {t ? "Προσθήκη Widget" : "Add widget"}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-              Choose a widget type for this section
+              {t ? "Επιλέξτε τύπο widget για αυτή την ενότητα" : "Choose a widget type for this section"}
             </div>
           </div>
           <button
@@ -133,7 +135,7 @@ export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose }: A
                     marginBottom: 10, display: "flex", alignItems: "center", gap: 6,
                   }}
                 >
-                  <GroupIcon size={12} /> {group.label}
+                  <GroupIcon size={12} /> {t ? group.labelEl : group.label}
                 </div>
                 <div
                   style={{
@@ -189,7 +191,7 @@ export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose }: A
                             {def.label}
                           </div>
                           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.4 }}>
-                            {meta.description}
+                            {t ? meta.descEl : meta.description}
                           </div>
                         </div>
                         <div style={{

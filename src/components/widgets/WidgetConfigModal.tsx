@@ -19,46 +19,37 @@ interface WidgetConfigModalProps {
   devices: Device[];
   onSave: (type: WidgetType, title: string, config: WidgetConfig) => void | Promise<void>;
   onClose: () => void;
+  locale?: string;
 }
 
-const WIDGET_TYPE_GROUPS: { label: string; types: WidgetType[] }[] = [
-  {
-    label: "Numeric",
-    types: ["gauge", "stat-card"],
-  },
-  {
-    label: "Time Series",
-    types: ["line-chart", "area-chart", "bar-chart"],
-  },
-  {
-    label: "Location & Grid",
-    types: ["map", "device-grid"],
-  },
-  {
-    label: "Data",
-    types: ["telemetry-table", "alert-summary"],
-  },
+const WIDGET_TYPE_GROUPS: { label: string; labelEl: string; types: WidgetType[] }[] = [
+  { label: "Numeric",         labelEl: "Αριθμητικά", types: ["gauge", "stat-card"] },
+  { label: "Time Series",     labelEl: "Χρονοσειρές", types: ["line-chart", "area-chart", "bar-chart"] },
+  { label: "Location & Grid", labelEl: "Τοποθεσία & Πλέγμα", types: ["map", "device-grid"] },
+  { label: "Data",            labelEl: "Δεδομένα", types: ["telemetry-table", "alert-summary"] },
 ];
 
 const TIME_RANGE_OPTIONS = [
-  { value: "1h",  label: "Last 1 hour" },
-  { value: "6h",  label: "Last 6 hours" },
-  { value: "24h", label: "Last 24 hours" },
-  { value: "7d",  label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
+  { value: "1h",  label: "Last 1 hour",   labelEl: "Τελευταία 1 ώρα" },
+  { value: "6h",  label: "Last 6 hours",  labelEl: "Τελευταίες 6 ώρες" },
+  { value: "24h", label: "Last 24 hours", labelEl: "Τελευταίες 24 ώρες" },
+  { value: "7d",  label: "Last 7 days",   labelEl: "Τελευταίες 7 ημέρες" },
+  { value: "30d", label: "Last 30 days",  labelEl: "Τελευταίες 30 ημέρες" },
 ];
 
-const COLOR_SCHEME_OPTIONS: { value: WidgetConfig["colorScheme"]; label: string; color: string }[] = [
-  { value: "orange", label: "Orange", color: "#ff6600" },
-  { value: "blue",   label: "Blue",   color: "#3b82f6" },
-  { value: "green",  label: "Green",  color: "#22c55e" },
-  { value: "purple", label: "Purple", color: "#a855f7" },
+const COLOR_SCHEME_OPTIONS: { value: WidgetConfig["colorScheme"]; label: string; labelEl: string; color: string }[] = [
+  { value: "orange", label: "Orange", labelEl: "Πορτοκαλί", color: "#ff6600" },
+  { value: "blue",   label: "Blue",   labelEl: "Μπλε",      color: "#3b82f6" },
+  { value: "green",  label: "Green",  labelEl: "Πράσινο",   color: "#22c55e" },
+  { value: "purple", label: "Purple", labelEl: "Μωβ",       color: "#a855f7" },
 ];
 
 type Step = "type" | "source" | "display" | "thresholds";
 
-function stepLabel(step: Step): string {
-  return { type: "Type", source: "Data Source", display: "Display", thresholds: "Thresholds" }[step];
+function stepLabel(step: Step, isGr: boolean): string {
+  return isGr
+    ? ({ type: "Τύπος", source: "Πηγή", display: "Εμφάνιση", thresholds: "Κατώφλια" }[step])
+    : ({ type: "Type",  source: "Data Source", display: "Display", thresholds: "Thresholds" }[step]);
 }
 
 const STEPS_BY_TYPE: Record<WidgetType, Step[]> = {
@@ -80,7 +71,9 @@ export default function WidgetConfigModal({
   devices,
   onSave,
   onClose,
+  locale = "el",
 }: WidgetConfigModalProps) {
+  const t = locale === "el";
   const [widgetType, setWidgetType] = useState<WidgetType>(initialType ?? "stat-card");
   const [title, setTitle] = useState(initialTitle ?? "");
   const [config, setConfig] = useState<WidgetConfig>(initialConfig ?? {});
@@ -139,7 +132,7 @@ export default function WidgetConfigModal({
                 marginBottom: 8,
               }}
             >
-              {group.label}
+              {t ? group.labelEl : group.label}
             </div>
             <div
               style={{
@@ -354,7 +347,7 @@ export default function WidgetConfigModal({
                         : "var(--text-muted)",
                   }}
                 >
-                  {opt.label}
+                  {t ? opt.labelEl : opt.label}
                 </button>
               ))}
             </div>
@@ -369,13 +362,13 @@ export default function WidgetConfigModal({
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Color scheme */}
         <div>
-          <label className="label">Color scheme</label>
+          <label className="label">{t ? "Χρώμα" : "Color scheme"}</label>
           <div style={{ display: "flex", gap: 8 }}>
             {COLOR_SCHEME_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setConfigField("colorScheme", opt.value)}
-                title={opt.label}
+                title={t ? opt.labelEl : opt.label}
                 style={{
                   width: 36,
                   height: 36,
@@ -548,10 +541,12 @@ export default function WidgetConfigModal({
         >
           <div>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-              {initialType ? "Edit widget" : "Add widget"}
+              {initialType
+                ? (t ? "Επεξεργασία widget" : "Edit widget")
+                : (t ? "Προσθήκη widget" : "Add widget")}
             </h2>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
-              {WIDGET_DEFAULTS[widgetType].label} — {stepLabel(step)}
+              {WIDGET_DEFAULTS[widgetType].label} — {stepLabel(step, t)}
             </p>
           </div>
           <button
