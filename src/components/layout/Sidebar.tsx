@@ -8,6 +8,7 @@ import {
   FiHelpCircle, FiLogOut, FiChevronLeft, FiChevronRight,
   FiUsers, FiBookOpen, FiBarChart2, FiShield, FiLayers, FiArchive,
 } from "react-icons/fi";
+import LicenseButton from "./LicenseButton";
 
 const LayoutDashboard = FiGrid;
 const Cpu = FiCpu;
@@ -126,8 +127,12 @@ export default function Sidebar({ collapsed, onToggle, role, locale }: SidebarPr
           ))}
         </nav>
 
-        {/* Bottom: collapse toggle + logout */}
+        {/* Bottom: license (super-admin only) + logout + collapse */}
         <div style={{ borderTop: "1px solid var(--border)", padding: "8px 0" }}>
+          {role === "SUPER_ADMIN" && (
+            <LicenseButton collapsed={collapsed} locale={locale} />
+          )}
+
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="sidebar-link btn-ghost"
