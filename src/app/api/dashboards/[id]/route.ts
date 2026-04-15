@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth, isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -26,14 +26,21 @@ const updateSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+function dashboardWhere(id: string, session: { user: { role: string; tenantId: string | null } }) {
+  const where: Record<string, unknown> = { id };
+  if (!isAdmin(session.user.role)) where.tenantId = session.user.tenantId;
+  return where;
+}
+
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(session.user.role) && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dashboard = await prisma.dashboard.findFirst({
-    where: { id, tenantId: session.user.tenantId },
+    where: dashboardWhere(id, session),
     include: { widgets: { orderBy: { createdAt: "asc" } } },
   });
   if (!dashboard)
@@ -44,13 +51,14 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(session.user.role) && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role === "VIEWER")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dashboard = await prisma.dashboard.findFirst({
-    where: { id, tenantId: session.user.tenantId },
+    where: dashboardWhere(id, session),
   });
   if (!dashboard)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -80,13 +88,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(session.user.role) && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role === "VIEWER")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const dashboard = await prisma.dashboard.findFirst({
-    where: { id, tenantId: session.user.tenantId },
+    where: dashboardWhere(id, session),
   });
   if (!dashboard)
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth, isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -12,7 +12,10 @@ import { prisma } from "@/lib/prisma";
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = isAdmin(session.user.role);
+  if (!admin && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
@@ -27,9 +30,11 @@ export async function GET(req: NextRequest) {
   if (!deviceId)
     return NextResponse.json({ error: "deviceId required" }, { status: 400 });
 
-  // Scope check — device must belong to tenant
+  // Scope check — tenant users restricted to their own tenant; admins see any
+  const deviceWhere: Record<string, unknown> = { id: deviceId };
+  if (!admin) deviceWhere.tenantId = session.user.tenantId;
   const device = await prisma.device.findFirst({
-    where: { id: deviceId, tenantId: session.user.tenantId },
+    where: deviceWhere,
     select: { id: true },
   });
   if (!device)
