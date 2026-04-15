@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   FiCalendar, FiSend, FiCheck, FiClock, FiCreditCard, FiCopy,
   FiLoader, FiAlertCircle, FiCheckCircle, FiExternalLink,
+  FiDollarSign, FiX,
 } from "react-icons/fi";
 import {
   setInvoiceGraceAction, sendProformaAction, markInvoicePaidAction,
-  createVivaLinkAction,
+  createVivaLinkAction, recordPaymentAction, type RecordPaymentInput,
 } from "@/app/(admin)/admin/billing/actions";
+import m from "@/components/customers/customers.module.css";
 
 export interface InvoiceRowData {
   id: string;
@@ -37,6 +39,7 @@ export default function InvoiceRow({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [graceOpen, setGraceOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [graceDate, setGraceDate] = useState(
     invoice.graceUntil ? invoice.graceUntil.slice(0, 10) : ""
   );
@@ -218,18 +221,179 @@ export default function InvoiceRow({
               )}
               <button
                 type="button"
-                className="btn-ghost"
-                style={{ padding: "5px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 6, color: "var(--green)" }}
-                onClick={() => run(async () => { await markInvoicePaidAction(invoice.id); return { ok: true }; })}
+                className="btn-primary"
+                style={{ padding: "5px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 6, background: "var(--green)", borderColor: "var(--green)" }}
+                onClick={() => setPaymentOpen(true)}
                 disabled={pending}
               >
+                <FiDollarSign size={12} />
+                {t ? "Καταχώρηση Πληρωμής" : "Record Payment"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ padding: "5px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 6 }}
+                onClick={() => run(async () => { await markInvoicePaidAction(invoice.id); return { ok: true }; })}
+                disabled={pending}
+                title={t ? "Απλή σήμανση χωρίς καταχώρηση πληρωμής" : "Flag as paid without recording a payment"}
+              >
                 <FiCheck size={12} />
-                {t ? "Σήμανση ως πληρωμένο" : "Mark paid"}
+                {t ? "Σήμανση χωρίς πληρωμή" : "Flag paid"}
               </button>
             </>
           )}
         </div>
       )}
+
+      {paymentOpen && (
+        <PaymentModal
+          invoice={invoice}
+          onClose={() => setPaymentOpen(false)}
+          t={t}
+        />
+      )}
+    </div>
+  );
+}
+
+function PaymentModal({
+  invoice, onClose, t,
+}: {
+  invoice: InvoiceRowData;
+  onClose: () => void;
+  t: boolean;
+}) {
+  const router = useRouter();
+  const [amount, setAmount] = useState(invoice.total.toFixed(2));
+  const [method, setMethod] = useState<RecordPaymentInput["method"]>("bank-transfer");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [receivedAt, setReceivedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [markPaid, setMarkPaid] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    start(async () => {
+      const r = await recordPaymentAction({
+        invoiceId: invoice.id,
+        amount: Number(amount),
+        method,
+        reference,
+        notes,
+        receivedAt,
+        markPaid,
+      });
+      if (r.ok) { router.refresh(); onClose(); }
+      else setError(r.error ?? "Error");
+    });
+  }
+
+  return (
+    <div className={m.backdrop} onClick={onClose}>
+      <div className={m.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className={m.modalHeader}>
+          <div className={m.modalTitle}>
+            <FiDollarSign size={16} />
+            {t ? "Καταχώρηση Πληρωμής" : "Record Payment"}
+          </div>
+          <button onClick={onClose} className={m.modalClose}><FiX size={18} /></button>
+        </div>
+        <div className={m.modalBody}>
+          <div style={{ padding: 10, background: "var(--bg-elevated)", borderRadius: 6, marginBottom: 14, fontSize: "0.82rem" }}>
+            <div style={{ color: "var(--text-muted)", fontSize: "0.7rem", textTransform: "uppercase", marginBottom: 2 }}>
+              {invoice.tenantName}
+            </div>
+            <div style={{ fontWeight: 600 }}>
+              {new Date(invoice.periodStart).toLocaleDateString(t ? "el-GR" : "en-GB", { month: "long", year: "numeric" })}
+              {" · "}
+              {invoice.deviceCount} {t ? "συσκευές" : "devices"}
+              {" · "}
+              <strong style={{ color: "var(--orange)" }}>€{invoice.total.toFixed(2)}</strong>
+            </div>
+          </div>
+
+          {error && (
+            <div className={`${m.alert} ${m.alertError}`} style={{ marginBottom: 12 }}>
+              <FiAlertCircle size={14} /> {error}
+            </div>
+          )}
+
+          <form onSubmit={submit} className={m.form}>
+            <div className={m.grid4}>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Ποσό" : "Amount"} (€)</label>
+                <input
+                  type="number" step="0.01" min="0" required
+                  className="input"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Μέθοδος" : "Method"}</label>
+                <select
+                  className="input"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as RecordPaymentInput["method"])}
+                >
+                  <option value="bank-transfer">{t ? "Τραπεζική μεταφορά" : "Bank transfer"}</option>
+                  <option value="cash">{t ? "Μετρητά" : "Cash"}</option>
+                  <option value="check">{t ? "Επιταγή" : "Check"}</option>
+                  <option value="viva">Viva Wallet</option>
+                  <option value="other">{t ? "Άλλο" : "Other"}</option>
+                </select>
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Αναφορά" : "Reference"}</label>
+                <input
+                  className="input"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder={t ? "π.χ. IBAN ref, αρ. επιταγής" : "e.g. bank ref, check #"}
+                />
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Ημερομηνία" : "Received at"}</label>
+                <input
+                  type="date" className="input" required
+                  value={receivedAt}
+                  onChange={(e) => setReceivedAt(e.target.value)}
+                />
+              </div>
+              <div className={`${m.field} ${m.span4}`}>
+                <label className="label">{t ? "Σημειώσεις" : "Notes"}</label>
+                <textarea
+                  rows={2}
+                  className="input"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  style={{ resize: "vertical", fontFamily: "inherit" }}
+                />
+              </div>
+              <label className={`${m.checkboxRow} ${m.span4}`}>
+                <input
+                  type="checkbox"
+                  checked={markPaid}
+                  onChange={(e) => setMarkPaid(e.target.checked)}
+                />
+                {t
+                  ? "Σήμανση τιμολογίου ως πληρωμένο αν το ποσό καλύπτει το υπόλοιπο"
+                  : "Mark invoice as paid if amount covers the remainder"}
+              </label>
+            </div>
+
+            <div className={m.saveBar}>
+              <button type="submit" disabled={pending} className={`btn-primary ${m.saveBtn}`}>
+                {pending ? <FiLoader size={16} className="animate-spin" /> : <FiCheck size={16} />}
+                {t ? "Καταχώρηση" : "Record"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

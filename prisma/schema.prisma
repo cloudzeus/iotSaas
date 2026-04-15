@@ -32,17 +32,18 @@ model Plan {
 // Every Tenant links back to a Customer (CRM master data).
 
 model Tenant {
-  id           String      @id @default(cuid())
-  customerId   Int         @unique
-  customer     Customer    @relation(fields: [customerId], references: [id])
-  name         String      @db.VarChar(255)
-  slug         String      @unique @db.VarChar(100)
-  planId       String?
-  plan         Plan?       @relation(fields: [planId], references: [id])
-  billingEmail String?     @db.VarChar(255)
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  customerId        Int         @unique
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  name              String      @db.VarChar(255)
+  slug              String      @unique @db.VarChar(100)
+  planId            String?
+  plan              Plan?       @relation(fields: [planId], references: [id])
+  billingEmail      String?     @db.VarChar(255)
+  defaultGraceDays  Int         @default(0)
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   users        User[]
   devices      Device[]
@@ -351,8 +352,26 @@ model Invoice {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  payments       Payment[]
+
   @@index([tenantId])
   @@map("invoices")
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount     Decimal  @db.Decimal(10, 2)
+  method     String   @db.VarChar(30)   // "cash" | "bank-transfer" | "check" | "viva" | "other"
+  reference  String?  @db.VarChar(100)  // e.g. bank ref, check number, Viva txId
+  notes      String?  @db.Text
+  receivedAt DateTime @default(now())
+  createdBy  String?  // user id
+  createdAt  DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("payments")
 }
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────

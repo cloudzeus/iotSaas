@@ -43,6 +43,68 @@ export async function markInvoicePaidAction(invoiceId: string): Promise<void> {
   revalidatePath("/admin/billing");
 }
 
+export interface RecordPaymentInput {
+  invoiceId: string;
+  amount: number;
+  method: "cash" | "bank-transfer" | "check" | "viva" | "other";
+  reference?: string;
+  notes?: string;
+  receivedAt?: string;    // ISO date
+  markPaid?: boolean;     // default true when amount covers the remainder
+}
+
+export async function recordPaymentAction(input: RecordPaymentInput): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireAdmin();
+  const invoice = await db.invoice.findUnique({
+    where: { id: input.invoiceId },
+    include: { payments: true },
+  });
+  if (!invoice) return { ok: false, error: "Invoice not found" };
+
+  const alreadyPaid = invoice.payments.reduce((s, p) => s + Number(p.amount), 0);
+  const total = Number(invoice.total);
+  const remaining = +(total - alreadyPaid).toFixed(2);
+  const amount = +input.amount.toFixed(2);
+  if (!(amount > 0)) return { ok: false, error: "Amount must be positive" };
+
+  await db.payment.create({
+    data: {
+      invoiceId: invoice.id,
+      amount,
+      method: input.method,
+      reference: input.reference?.trim() || null,
+      notes: input.notes?.trim() || null,
+      receivedAt: input.receivedAt ? new Date(input.receivedAt) : new Date(),
+      createdBy: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
+    },
+  });
+
+  const coversRemaining = amount >= remaining - 0.009;
+  const shouldMarkPaid = input.markPaid !== false && coversRemaining;
+  if (shouldMarkPaid) {
+    await db.invoice.update({
+      where: { id: invoice.id },
+      data: { status: "PAID", paidAt: new Date() },
+    });
+  }
+  revalidatePath("/admin/tenants");
+  revalidatePath("/admin/billing");
+  return { ok: true };
+}
+
+export async function setTenantDefaultGraceAction(input: {
+  tenantId: string;
+  defaultGraceDays: number;
+}): Promise<void> {
+  await requireAdmin();
+  const days = Math.max(0, Math.min(365, Math.round(input.defaultGraceDays)));
+  await db.tenant.update({
+    where: { id: input.tenantId },
+    data: { defaultGraceDays: days },
+  });
+  revalidatePath("/admin/tenants");
+}
+
 export interface SendProformaResult {
   ok: boolean;
   emailId?: string;

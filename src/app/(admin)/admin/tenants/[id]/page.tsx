@@ -7,6 +7,7 @@ import {
   FiDollarSign, FiFileText, FiExternalLink,
 } from "react-icons/fi";
 import InvoiceRow from "@/components/billing/InvoiceRow";
+import TenantGraceCard from "@/components/billing/TenantGraceCard";
 
 export const metadata = { title: "Tenant" };
 
@@ -89,6 +90,15 @@ export default async function TenantOverviewPage({ params }: Params) {
             desc={tenant.customer.name} />
         )}
       </div>
+
+      {/* Default grace period */}
+      <section style={{ marginBottom: 20 }}>
+        <TenantGraceCard
+          tenantId={tenant.id}
+          initial={tenant.defaultGraceDays}
+          locale={session.user.locale}
+        />
+      </section>
 
       {/* Unpaid invoices */}
       {tenant.invoices.length > 0 && (

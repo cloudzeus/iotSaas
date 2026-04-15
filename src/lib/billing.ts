@@ -74,17 +74,23 @@ export async function recalcCurrentInvoice(tenantId: string) {
   // Only create a new invoice if there's something to bill
   if (deviceCount === 0) return null;
 
+  const periodEnd = new Date(end.getTime() - 1);
+  const graceUntil = tenant.defaultGraceDays > 0
+    ? new Date(periodEnd.getTime() + tenant.defaultGraceDays * 24 * 60 * 60 * 1000)
+    : null;
+
   return db.invoice.create({
     data: {
       tenantId,
       periodStart: start,
-      periodEnd: new Date(end.getTime() - 1),
+      periodEnd,
       deviceCount,
       pricePerDevice,
       subtotal,
       vat,
       total,
       status: "PENDING",
+      graceUntil,
       lineItems,
     },
   });
