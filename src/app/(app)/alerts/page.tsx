@@ -21,7 +21,7 @@ export default async function AlertsPage() {
       where: { tenantId },
       include: {
         device: { select: { name: true } },
-        rule: { select: { name: true } },
+        alertRule: { select: { name: true } },
       },
       orderBy: { firedAt: "desc" },
       take: 50,

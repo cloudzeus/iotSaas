@@ -122,7 +122,7 @@ export default function DashboardClient({
     setCreatingDash(true);
     try {
       const created = await createDashboard(name);
-      setDashboards((prev) => [...prev, created as DashboardData]);
+      setDashboards((prev) => [...prev, created as unknown as DashboardData]);
       setActiveDashboardId(created.id);
       setShowNewDashInput(false);
       setNewDashName("");

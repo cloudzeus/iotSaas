@@ -20,7 +20,7 @@ interface Props {
     id: string; firedAt: string; severity: string; channel: string; value: number;
     message: string; acknowledged: boolean;
     device: { name: string } | null;
-    rule: { name: string } | null;
+    alertRule: { name: string } | null;
   }>;
   devices: Array<{ id: string; name: string }>;
   locale: string;
@@ -115,7 +115,7 @@ export default function AlertsClient({ rules, events, devices, locale, canManage
                   events.map((ev) => (
                     <tr key={ev.id} style={{ opacity: ev.acknowledged ? 0.5 : 1 }}>
                       <td style={{ fontWeight: 500 }}>{ev.device?.name || "—"}</td>
-                      <td style={{ color: "var(--text-secondary)" }}>{ev.rule?.name || "—"}</td>
+                      <td style={{ color: "var(--text-secondary)" }}>{ev.alertRule?.name || "—"}</td>
                       <td>
                         <code style={{ fontSize: "0.75rem", background: "var(--bg-elevated)", padding: "2px 6px", borderRadius: "4px" }}>
                           {ev.channel}

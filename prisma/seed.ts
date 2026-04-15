@@ -76,13 +76,10 @@ async function main() {
       slug: "acme-logistics",
       planId: "plan_growth",
       billingEmail: "billing@acme-logistics.gr",
-      vatNumber: "EL123456789",
-      address: {
-        street: "Λεωφόρος Αθηνών 45",
-        city: "Αθήνα",
-        postcode: "10431",
-        country: "GR",
-      },
+      afm: "EL123456789",
+      address: "Λεωφόρος Αθηνών 45",
+      city: "Αθήνα",
+      zip: "10431",
     },
   });
   console.log(`  ✔ Demo tenant: ${demoTenant.name}`);
