@@ -1,5 +1,6 @@
 export type WidgetType =
   | "gauge"
+  | "thermometer"
   | "stat-card"
   | "line-chart"
   | "area-chart"
@@ -93,6 +94,7 @@ export const TIME_RANGE_MS: Record<TimeRange, number> = {
 
 export const WIDGET_DEFAULTS: Record<WidgetType, { w: number; h: number; label: string; icon: string }> = {
   "gauge":          { w: 3, h: 3, label: "Gauge",          icon: "gauge" },
+  "thermometer":    { w: 2, h: 4, label: "Thermometer",    icon: "thermometer" },
   "stat-card":      { w: 3, h: 2, label: "Stat Card",      icon: "hash" },
   "line-chart":     { w: 6, h: 4, label: "Line Chart",     icon: "trending-up" },
   "area-chart":     { w: 6, h: 4, label: "Area Chart",     icon: "area-chart" },

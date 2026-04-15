@@ -23,7 +23,7 @@ interface WidgetConfigModalProps {
 }
 
 const WIDGET_TYPE_GROUPS: { label: string; labelEl: string; types: WidgetType[] }[] = [
-  { label: "Numeric",         labelEl: "Αριθμητικά", types: ["gauge", "stat-card"] },
+  { label: "Numeric",         labelEl: "Αριθμητικά", types: ["gauge", "thermometer", "stat-card"] },
   { label: "Time Series",     labelEl: "Χρονοσειρές", types: ["line-chart", "area-chart", "bar-chart"] },
   { label: "Location & Grid", labelEl: "Τοποθεσία & Πλέγμα", types: ["map", "device-grid"] },
   { label: "Data",            labelEl: "Δεδομένα", types: ["telemetry-table", "alert-summary"] },
@@ -54,6 +54,7 @@ function stepLabel(step: Step, isGr: boolean): string {
 
 const STEPS_BY_TYPE: Record<WidgetType, Step[]> = {
   "gauge":           ["type", "source", "display", "thresholds"],
+  "thermometer":     ["type", "source", "display", "thresholds"],
   "stat-card":       ["type", "source", "display", "thresholds"],
   "line-chart":      ["type", "source", "display"],
   "area-chart":      ["type", "source", "display"],
@@ -181,9 +182,9 @@ export default function WidgetConfigModal({
   }
 
   function renderSourceStep() {
-    const needsChannel = ["gauge", "stat-card", "line-chart", "area-chart", "bar-chart"].includes(widgetType);
+    const needsChannel = ["gauge", "thermometer", "stat-card", "line-chart", "area-chart", "bar-chart"].includes(widgetType);
     const multipleDevices = ["map", "device-grid", "telemetry-table", "alert-summary"].includes(widgetType);
-    const multiChannels = ["line-chart", "area-chart", "bar-chart"].includes(widgetType);
+    const multiChannels = ["thermometer", "line-chart", "area-chart", "bar-chart"].includes(widgetType);
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -657,6 +658,7 @@ export default function WidgetConfigModal({
 // ─── Emoji icons for widget types ─────────────────────────────────────────────
 const WidgetIconEmoji: Record<WidgetType, string> = {
   "gauge":           "🔵",
+  "thermometer":     "🌡️",
   "stat-card":       "🔢",
   "line-chart":      "📈",
   "area-chart":      "📊",
@@ -669,6 +671,7 @@ const WidgetIconEmoji: Record<WidgetType, string> = {
 
 const WidgetDescriptions: Record<WidgetType, string> = {
   "gauge":           "Circular gauge with thresholds",
+  "thermometer":     "Mercury column for 1–2 channels",
   "stat-card":       "Large value with trend arrow",
   "line-chart":      "Time series line chart",
   "area-chart":      "Filled area time series",

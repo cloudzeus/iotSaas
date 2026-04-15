@@ -6,7 +6,7 @@ import type { WidgetType, WidgetConfig } from "./types";
 import WidgetConfigModal from "./WidgetConfigModal";
 import {
   FiX, FiHash, FiTrendingUp, FiMap, FiGrid, FiBell, FiList,
-  FiBarChart2, FiActivity, FiPieChart,
+  FiBarChart2, FiActivity, FiPieChart, FiThermometer,
 } from "react-icons/fi";
 import { LuGauge } from "react-icons/lu";
 
@@ -28,6 +28,7 @@ interface WidgetMeta {
 
 const META: Record<WidgetType, WidgetMeta & { descEl: string }> = {
   "gauge":           { icon: LuGauge,       color: "#ff6600", description: "Radial gauge with color thresholds", descEl: "Ραντάρ μέτρησης με έγχρωμα όρια" },
+  "thermometer":     { icon: FiThermometer, color: "#ef4444", description: "Mercury column for 1–2 channels",    descEl: "Στήλη υδραργύρου για 1–2 κανάλια" },
   "stat-card":       { icon: FiHash,        color: "#3b82f6", description: "Large numeric value with trend",     descEl: "Μεγάλη τιμή με δείκτη τάσης" },
   "line-chart":      { icon: FiActivity,    color: "#22c55e", description: "Time-series line chart",              descEl: "Γραμμικό διάγραμμα χρονοσειράς" },
   "area-chart":      { icon: FiTrendingUp,  color: "#8b5cf6", description: "Filled area time-series",             descEl: "Γέμισμα χρονοσειράς (area)" },
@@ -39,7 +40,7 @@ const META: Record<WidgetType, WidgetMeta & { descEl: string }> = {
 };
 
 const GROUPS: { label: string; labelEl: string; icon: React.ComponentType<{ size?: number }>; types: WidgetType[] }[] = [
-  { label: "Numeric",     labelEl: "Αριθμητικά",   icon: FiHash,     types: ["gauge", "stat-card"] },
+  { label: "Numeric",     labelEl: "Αριθμητικά",   icon: FiHash,     types: ["gauge", "thermometer", "stat-card"] },
   { label: "Charts",      labelEl: "Γραφήματα",    icon: FiPieChart, types: ["line-chart", "area-chart", "bar-chart"] },
   { label: "Spatial",     labelEl: "Χωρικά",       icon: FiMap,      types: ["map", "device-grid"] },
   { label: "Data tables", labelEl: "Πίνακες",      icon: FiList,     types: ["telemetry-table", "alert-summary"] },

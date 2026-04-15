@@ -11,6 +11,7 @@ import type { WidgetType, WidgetConfig } from "./types";
 // ── Lazy-loaded widget components ─────────────────────────────────────────────
 
 const GaugeWidget        = dynamic(() => import("./GaugeWidget"),        { ssr: false });
+const ThermometerWidget  = dynamic(() => import("./ThermometerWidget"),  { ssr: false });
 const StatCardWidget     = dynamic(() => import("./StatCardWidget"),      { ssr: false });
 const LineChartWidget    = dynamic(() => import("./LineChartWidget"),     { ssr: false });
 const AreaChartWidget    = dynamic(() => import("./AreaChartWidget"),     { ssr: false });
@@ -73,6 +74,8 @@ export default function WidgetRenderer({ id, type, title, config }: WidgetRender
   switch (type) {
     case "gauge":
       return <GaugeWidget {...common} />;
+    case "thermometer":
+      return <ThermometerWidget {...common} />;
     case "stat-card":
       return <StatCardWidget {...common} />;
     case "line-chart":
