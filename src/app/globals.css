@@ -283,47 +283,52 @@
 
   /* ─── Widget resize handles (react-grid-layout) ────────────────── */
   .react-resizable-handle {
-    opacity: 0;
-    transition: opacity 0.15s;
+    z-index: 20 !important;
+    opacity: 0.4;
+    transition: opacity 0.15s, transform 0.1s;
   }
-  .react-grid-item:hover > .react-resizable-handle {
-    opacity: 1;
-  }
+  .react-grid-item:hover > .react-resizable-handle { opacity: 1; }
+  .react-resizable-handle:hover { transform: scale(1.15); }
   .react-resizable-handle::after {
     border-color: var(--orange) !important;
+    border-width: 0 2px 2px 0 !important;
+    width: 8px !important;
+    height: 8px !important;
   }
   .react-resizable-handle-se {
-    right: 4px !important;
-    bottom: 4px !important;
-    width: 14px !important;
-    height: 14px !important;
-    cursor: se-resize;
+    width: 20px !important;
+    height: 20px !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    cursor: nwse-resize;
   }
   .react-resizable-handle-s {
-    bottom: 2px !important;
     left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 40px !important;
-    height: 6px !important;
-    cursor: s-resize;
+    bottom: -2px !important;
+    width: 48px !important;
+    height: 8px !important;
+    transform: translateX(-50%);
     background: var(--orange);
-    border-radius: 3px;
-    opacity: 0;
+    border-radius: 4px;
+    cursor: ns-resize;
   }
-  .react-grid-item:hover > .react-resizable-handle-s { opacity: 0.5; }
+  .react-grid-item:hover > .react-resizable-handle-s {
+    opacity: 0.6;
+  }
   .react-resizable-handle-s::after { display: none; }
   .react-resizable-handle-e {
-    right: 2px !important;
     top: 50% !important;
-    transform: translateY(-50%) !important;
-    width: 6px !important;
-    height: 40px !important;
-    cursor: e-resize;
+    right: -2px !important;
+    width: 8px !important;
+    height: 48px !important;
+    transform: translateY(-50%);
     background: var(--orange);
-    border-radius: 3px;
-    opacity: 0;
+    border-radius: 4px;
+    cursor: ew-resize;
   }
-  .react-grid-item:hover > .react-resizable-handle-e { opacity: 0.5; }
+  .react-grid-item:hover > .react-resizable-handle-e {
+    opacity: 0.6;
+  }
   .react-resizable-handle-e::after { display: none; }
 
   /* Grid item placeholder (drag ghost) */

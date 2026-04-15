@@ -31,6 +31,8 @@ const loginSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Required when deployed behind a reverse proxy (Coolify, Vercel, etc.)
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
