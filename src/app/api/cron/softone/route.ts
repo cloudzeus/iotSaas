@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { syncSoftoneCustomers, syncSoftoneCountries } from "@/lib/softone-sync";
+import {
+  syncSoftoneCustomers, syncSoftoneCountries, syncSoftoneTrdpGroups,
+} from "@/lib/softone-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +42,8 @@ export async function POST(req: NextRequest) {
         result = await syncSoftoneCustomers(Math.max(s.intervalMin * 2, 10), "cron");
       } else if (s.kind === "softone-countries") {
         result = await syncSoftoneCountries("cron");
+      } else if (s.kind === "softone-trdpgroups") {
+        result = await syncSoftoneTrdpGroups("cron");
       } else {
         continue;
       }

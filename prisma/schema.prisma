@@ -437,6 +437,21 @@ model Country {
   @@map("countries")
 }
 
+model TrdpGroup {
+  id        Int      @id @default(autoincrement())
+  trdpgroup Int      @unique
+  company   Int
+  sodtype   Int
+  name      String   @db.VarChar(150)
+  code      String?  @db.VarChar(30)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([company, sodtype])
+  @@map("trdp_groups")
+}
+
 // ─── Sync schedule (super-admin configurable) ────────────────────────────────
 
 model SyncSchedule {

@@ -59,7 +59,9 @@ export default function SyncSchedules({
           ? "/api/softone/sync-all"
           : kind === "softone-countries"
             ? "/api/softone/sync-countries"
-            : null;
+            : kind === "softone-trdpgroups"
+              ? "/api/softone/sync-trdpgroups"
+              : null;
         if (!endpoint) return;
         const res = await fetch(endpoint, { method: "POST" });
         const data = await res.json();

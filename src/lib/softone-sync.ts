@@ -4,8 +4,10 @@ import {
   fetchAllCustomers,
   fetchCustomersByDateRange,
   fetchAllCountries,
+  fetchAllTrdpGroups,
   type S1Customer,
   type S1Country,
+  type S1TrdpGroup,
 } from "@/lib/softone";
 
 async function findExistingCustomer(c: S1Customer) {
@@ -201,5 +203,54 @@ export async function syncSoftoneCountries(
   return recordJob("softone-countries", trigger, {}, async () => {
     const rows = await fetchAllCountries();
     return runUpsertCountries(rows);
+  });
+}
+
+// ─── Trader price groups ────────────────────────────────────────────────────
+
+async function runUpsertTrdpGroups(rows: S1TrdpGroup[]): Promise<SyncResult> {
+  const start = Date.now();
+  let created = 0, updated = 0, skipped = 0;
+  const errors: SyncResult["errors"] = [];
+  for (const g of rows) {
+    try {
+      const data = {
+        trdpgroup: g.trdpgroup,
+        company: g.company,
+        sodtype: g.sodtype,
+        name: g.name,
+        code: g.code,
+      };
+      const existing = await db.trdpGroup.findUnique({ where: { trdpgroup: g.trdpgroup } });
+      if (existing) {
+        await db.trdpGroup.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await db.trdpGroup.create({ data });
+        created++;
+      }
+    } catch (err) {
+      errors.push({
+        identifier: `trdpgroup=${g.trdpgroup}`,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      skipped++;
+    }
+  }
+  return {
+    scanned: rows.length,
+    created, updated, skipped, errors,
+    since: "ALL",
+    until: new Date().toISOString(),
+    durationMs: Date.now() - start,
+  };
+}
+
+export async function syncSoftoneTrdpGroups(
+  trigger: "manual" | "cron" | "api" = "manual"
+) {
+  return recordJob("softone-trdpgroups", trigger, {}, async () => {
+    const rows = await fetchAllTrdpGroups();
+    return runUpsertTrdpGroups(rows);
   });
 }

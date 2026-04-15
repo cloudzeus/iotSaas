@@ -275,6 +275,32 @@ export async function fetchAllCountries(): Promise<S1Country[]> {
   }).then((rows) => rows.filter((c) => c.country > 0 && c.name));
 }
 
+// ─── Trader price groups (TRDPGROUP) ────────────────────────────────────────
+
+export interface S1TrdpGroup {
+  trdpgroup: number;
+  company: number;
+  sodtype: number;
+  name: string;
+  code: string | null;
+}
+
+export async function fetchAllTrdpGroups(): Promise<S1TrdpGroup[]> {
+  const company = process.env.SOFTONE_COMPANY ?? "10";
+  return s1GetTable<S1TrdpGroup>({
+    table: "TRDPGROUP",
+    fields: "TRDPGROUP,COMPANY,SODTYPE,name,code",
+    filter: `company=${company} AND sodtype=13`,
+    mapRow: (r) => ({
+      trdpgroup: Number(r.trdpgroup ?? r.TRDPGROUP ?? 0),
+      company:   Number(r.company   ?? r.COMPANY   ?? 0),
+      sodtype:   Number(r.sodtype   ?? r.SODTYPE   ?? 0),
+      name:      String(r.name ?? r.NAME ?? ""),
+      code:      r.code ? String(r.code) : null,
+    }),
+  }).then((rows) => rows.filter((g) => g.trdpgroup > 0 && g.name));
+}
+
 /** Fetch customers touched in [since, until]. */
 export async function fetchCustomersByDateRange(
   since: Date,

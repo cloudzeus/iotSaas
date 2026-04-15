@@ -31,15 +31,18 @@ interface Customer {
   consent: boolean;
   remark: string | null;
   isprosp: number;
+  trdpgroup: number | null;
 }
 
 interface CountryOpt { country: number; name: string; shortcut: string | null; }
+interface TrdpGroupOpt { trdpgroup: number; name: string; }
 
 export default function CustomerEditor({
-  customer, countries, locale,
+  customer, countries, trdpGroups, locale,
 }: {
   customer: Customer;
   countries: CountryOpt[];
+  trdpGroups: TrdpGroupOpt[];
   locale: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -59,6 +62,7 @@ export default function CustomerEditor({
         <EditorModal
           customer={customer}
           countries={countries}
+          trdpGroups={trdpGroups}
           onClose={() => setOpen(false)}
           t={t}
         />
@@ -68,10 +72,11 @@ export default function CustomerEditor({
 }
 
 function EditorModal({
-  customer, countries, onClose, t,
+  customer, countries, trdpGroups, onClose, t,
 }: {
   customer: Customer;
   countries: CountryOpt[];
+  trdpGroups: TrdpGroupOpt[];
   onClose: () => void;
   t: boolean;
 }) {
@@ -110,6 +115,7 @@ function EditorModal({
       consent: f.consent,
       remark: f.remark,
       isprosp: f.isprosp,
+      trdpgroup: f.trdpgroup,
     };
     start(async () => {
       try {
@@ -174,6 +180,22 @@ function EditorModal({
                     <option key={c.country} value={c.country}>
                       {c.name}{c.shortcut ? ` (${c.shortcut})` : ""}
                     </option>
+                  ))}
+                </select>
+              </div>
+            </Section>
+
+            <Section title="Softone">
+              <div className={`${m.field} ${m.span4}`}>
+                <label className="label">{t ? "Ομάδα πελατών (TRDPGROUP)" : "Customer price group"}</label>
+                <select
+                  className="input"
+                  value={f.trdpgroup != null ? String(f.trdpgroup) : ""}
+                  onChange={(e) => set("trdpgroup", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— {t ? "επιλέξτε" : "select"} —</option>
+                  {trdpGroups.map((g) => (
+                    <option key={g.trdpgroup} value={g.trdpgroup}>{g.name}</option>
                   ))}
                 </select>
               </div>
