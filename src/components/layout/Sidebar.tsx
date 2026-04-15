@@ -78,6 +78,8 @@ export default function Sidebar({ collapsed, onToggle, role, locale }: SidebarPr
     { href: "/admin/devices", icon: Cpu, label: t ? "Συσκευές" : "Devices" },
     { href: "/admin/widgets", icon: LayoutGrid, label: t ? "Widgets" : "Widgets" },
     { href: "/admin/plans", icon: BookOpen, label: t ? "Πλάνα" : "Plans" },
+    { href: "/admin/users", icon: Users, label: t ? "Χρήστες" : "Users" },
+    { href: "/admin/roles", icon: Shield, label: t ? "Ρόλοι" : "Roles" },
     { href: "/admin/sync", icon: History, label: t ? "Συγχρονισμοί" : "Sync Jobs" },
     { href: "/admin/audit", icon: Shield, label: t ? "Ιστορικό" : "Audit Log" },
     { href: "/admin/settings", icon: Settings, label: t ? "Ρυθμίσεις" : "Settings" },
