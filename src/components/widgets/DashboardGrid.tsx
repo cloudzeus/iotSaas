@@ -84,16 +84,24 @@ export default function DashboardGrid({
     );
   }
 
-  function toGridItems(sectionWidgets: WidgetRow[]): Layout[] {
-    return sectionWidgets.map((w) => ({
-      i: w.id,
-      x: w.position.x,
-      y: w.position.y,
-      w: w.position.w,
-      h: w.position.h,
-      minW: 2,
-      minH: 2,
-    }));
+  function toGridItems(sectionWidgets: WidgetRow[], sectionCols?: number): Layout[] {
+    // Compute a per-widget default width based on the section's columns setting.
+    // Existing widgets keep their stored width unless it exceeds the grid.
+    const perRow = Math.max(1, Math.min(12, sectionCols ?? 3));
+    const defaultW = Math.max(2, Math.min(12, Math.floor(COLS / perRow)));
+    return sectionWidgets.map((w) => {
+      const storedW = w.position.w ?? defaultW;
+      return {
+        i: w.id,
+        x: w.position.x,
+        y: w.position.y,
+        w: Math.max(2, Math.min(COLS, storedW || defaultW)),
+        h: Math.max(2, w.position.h || 4),
+        minW: 2,
+        minH: 2,
+        maxW: COLS,
+      };
+    });
   }
 
   // Debounced save when layout changes
@@ -303,24 +311,27 @@ export default function DashboardGrid({
                 )}
 
                 <GridLayout
-                  layout={toGridItems(sectionWidgets)}
+                  // Mobile: stack widgets full-width. Desktop: use stored widths (clamped to grid).
+                  layout={
+                    containerWidth < 640
+                      ? sectionWidgets.map((w, i) => ({
+                          i: w.id, x: 0, y: i * (w.position.h || 4),
+                          w: COLS, h: Math.max(2, w.position.h || 4),
+                          minW: COLS, maxW: COLS,
+                        }))
+                      : toGridItems(sectionWidgets, section.cols)
+                  }
                   cols={COLS}
                   rowHeight={ROW_HEIGHT}
                   width={containerWidth}
                   isDraggable={editMode}
                   isResizable={editMode}
                   onLayoutChange={(layout) => handleLayoutChange(section.id, layout)}
-                  // Mobile: stack widgets full-width. Desktop: use their stored widths.
-                  layout={containerWidth < 640
-                    ? sectionWidgets.map((w, i) => ({
-                        i: w.id, x: 0, y: i * (w.position.h || 4),
-                        w: COLS, h: w.position.h || 4,
-                      }))
-                    : undefined}
                   draggableHandle=".widget-drag-handle"
-                  margin={[8, 8]}
-                  containerPadding={[8, 8]}
-                  resizeHandles={["se"]}
+                  margin={[10, 10]}
+                  containerPadding={[0, 8]}
+                  resizeHandles={editMode ? ["s", "se", "e"] : []}
+                  compactType="vertical"
                 >
                   {sectionWidgets.map((widget) => (
                     <div
