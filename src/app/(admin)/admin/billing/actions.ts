@@ -176,6 +176,71 @@ export async function sendProformaAction(input: {
   }
 }
 
+export async function sendProformaToCustomEmailAction(input: {
+  invoiceId: string;
+  to: string;
+  withPaymentLink?: boolean;
+}): Promise<SendProformaResult> {
+  await requireAdmin();
+
+  const email = input.to.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Invalid email address" };
+  }
+
+  const invoice = await db.invoice.findUnique({
+    where: { id: input.invoiceId },
+    include: { tenant: true },
+  });
+  if (!invoice) return { ok: false, error: "Invoice not found" };
+
+  let paymentUrl: string | null = null;
+  if (input.withPaymentLink && process.env.VIVA_API_KEY) {
+    try {
+      const viva = createVivaWalletClient();
+      const orderCode = invoice.vivaOrderCode
+        ?? (await viva.createOrder(
+          invoice.tenantId, invoice.id, Number(invoice.total),
+          `DGSmart Hub · ${invoice.tenant.name} · ${periodLabel(invoice.periodStart)}`,
+        ));
+      if (orderCode) {
+        paymentUrl = viva.getCheckoutUrl(orderCode);
+        if (orderCode !== invoice.vivaOrderCode) {
+          await db.invoice.update({
+            where: { id: invoice.id },
+            data: { vivaOrderCode: orderCode },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[billing] Viva order creation failed:", err);
+    }
+  }
+
+  try {
+    const result = await sendProformaInvoiceEmail({
+      to: email,
+      tenantName: invoice.tenant.name,
+      invoiceId: invoice.id,
+      periodLabel: periodLabel(invoice.periodStart, "el"),
+      deviceCount: invoice.deviceCount,
+      pricePerDevice: Number(invoice.pricePerDevice),
+      subtotal: Number(invoice.subtotal),
+      vat: Number(invoice.vat),
+      total: Number(invoice.total),
+      graceUntil: invoice.graceUntil,
+      paymentUrl,
+      locale: "el",
+    });
+    revalidatePath("/admin/tenants");
+    revalidatePath("/admin/accounting");
+    revalidatePath(`/admin/invoices/${invoice.id}`);
+    return { ok: true, emailId: result.id, paymentUrl };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Send failed" };
+  }
+}
+
 export async function createVivaLinkAction(invoiceId: string): Promise<{ ok: boolean; paymentUrl?: string; error?: string }> {
   await requireAdmin();
   if (!process.env.VIVA_API_KEY) {
