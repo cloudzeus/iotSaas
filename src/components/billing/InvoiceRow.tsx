@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   FiCalendar, FiSend, FiCheck, FiClock, FiCreditCard, FiCopy,
   FiLoader, FiAlertCircle, FiCheckCircle, FiExternalLink,
-  FiDollarSign, FiX,
+  FiDollarSign, FiX, FiFileText,
 } from "react-icons/fi";
 import {
   setInvoiceGraceAction, sendProformaAction, markInvoicePaidAction,
@@ -100,6 +101,14 @@ export default function InvoiceRow({
         <FiCalendar size={16} style={{ color: "var(--text-muted)" }} />
         <div style={{ fontWeight: 600 }}>{pLabel}</div>
         {statusBadge}
+        <Link
+          href={`/admin/invoices/${invoice.id}`}
+          className="btn-ghost"
+          style={{ padding: "3px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+          title={t ? "Προβολή προφόρμας" : "View proforma"}
+        >
+          <FiFileText size={11} /> {t ? "Προβολή" : "View"}
+        </Link>
         <span style={{ flex: 1 }} />
         <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
           {invoice.deviceCount} {t ? "συσκευές" : "devices"}
