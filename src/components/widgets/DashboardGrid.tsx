@@ -104,9 +104,14 @@ export default function DashboardGrid({
     });
   }
 
-  // Debounced save when layout changes
-  function handleLayoutChange(sectionId: string, layout: Layout[]) {
-    // Update local state immediately
+  // Persist layout — only called from drag/resize stop, NOT from every
+  // onLayoutChange (which also fires when the grid swaps to mobile-stacked
+  // layout on window resize, and would otherwise overwrite the desktop layout).
+  function persistLayout(sectionId: string, layout: Layout[]) {
+    // Don't persist while we're in the forced mobile-stack layout — those
+    // positions are computed from container width, not user intent.
+    if (containerWidth < 640) return;
+
     setWidgets((prev) =>
       prev.map((w) => {
         const l = layout.find((item) => item.i === w.id);
@@ -118,7 +123,6 @@ export default function DashboardGrid({
       })
     );
 
-    // Debounce DB save
     const existing = saveTimers.current.get(sectionId);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(async () => {
@@ -326,7 +330,8 @@ export default function DashboardGrid({
                   width={containerWidth}
                   isDraggable={editMode}
                   isResizable={editMode}
-                  onLayoutChange={(layout) => handleLayoutChange(section.id, layout)}
+                  onDragStop={(layout) => persistLayout(section.id, layout)}
+                  onResizeStop={(layout) => persistLayout(section.id, layout)}
                   draggableHandle=".widget-drag-handle"
                   margin={[10, 10]}
                   containerPadding={[0, 8]}
