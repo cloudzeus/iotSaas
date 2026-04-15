@@ -97,9 +97,10 @@ async function processEvent(ev: MilesightWebhookEvent) {
     data: { lastSeenAt: ts, online: true },
   });
 
-  // PROPERTY events are device meta (firmware, model). TELEMETRY events carry
-  // sensor measurements. Only run alert rules on numeric telemetry.
-  if (ev.data.type !== "TELEMETRY") return;
+  // Both PROPERTY and TELEMETRY events can carry numeric sensor readings on
+  // Milesight LoRaWAN devices (battery, temperature, magnet_status, etc.).
+  // Only EVENT type is metadata-only — skip those.
+  if (ev.data.type === "EVENT") return;
 
   const points = flattenNumericPayload(payload);
   if (points.length === 0) return;
