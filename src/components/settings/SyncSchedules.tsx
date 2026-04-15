@@ -7,6 +7,7 @@ import {
   FiAlertCircle, FiDownloadCloud,
 } from "react-icons/fi";
 import { updateScheduleAction, seedSchedulesAction } from "@/app/(admin)/admin/settings/schedule-actions";
+import { SYNC_KINDS } from "@/app/(admin)/admin/settings/schedule-kinds";
 
 interface Schedule {
   id: string;
@@ -30,6 +31,9 @@ export default function SyncSchedules({
   const [runningKind, setRunningKind] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<{ kind: string; scanned: number; created: number; updated: number; skipped: number; error?: string } | null>(null);
   const t = locale === "el";
+
+  const existingKinds = new Set(schedules.map((s) => s.kind));
+  const missingKinds = SYNC_KINDS.filter((k) => !existingKinds.has(k.kind));
 
   if (schedules.length === 0) {
     return (
@@ -103,6 +107,32 @@ export default function SyncSchedules({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {missingKinds.length > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: 10, display: "flex", alignItems: "center", gap: 10,
+            background: "var(--orange-dim)", border: "1px solid var(--orange)",
+          }}
+        >
+          <div style={{ fontSize: "0.82rem", color: "var(--orange)", flex: 1 }}>
+            {t
+              ? `Νέα είδη συγχρονισμού: ${missingKinds.map((k) => k.label).join(", ")}`
+              : `New sync kinds available: ${missingKinds.map((k) => k.label).join(", ")}`}
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+            onClick={() => start(async () => { await seedSchedulesAction(); router.refresh(); })}
+            disabled={pending}
+          >
+            {pending ? <FiLoader size={12} className="animate-spin" /> : <FiClock size={12} />}
+            {t ? "Προσθήκη" : "Add"}
+          </button>
+        </div>
+      )}
+
       {schedules.map((s) => (
         <div
           key={s.id}
