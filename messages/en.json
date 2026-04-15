@@ -1,0 +1,230 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "devices": "Devices",
+    "alerts": "Alerts",
+    "billing": "Billing",
+    "settings": "Settings",
+    "support": "Support",
+    "logout": "Sign Out",
+    "admin": "Administration",
+    "tenants": "Tenants",
+    "plans": "Plans",
+    "audit": "Audit Log"
+  },
+  "auth": {
+    "login": "Sign In",
+    "email": "Email",
+    "password": "Password",
+    "loginButton": "Sign In",
+    "loginError": "Invalid email or password",
+    "welcome": "Welcome to DGSmart Hub",
+    "subtitle": "IoT Device Management"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "activeDevices": "Active Devices",
+    "totalDevices": "Total Devices",
+    "activeAlerts": "Active Alerts",
+    "monthlyBill": "Monthly Bill",
+    "recentActivity": "Recent Activity",
+    "noActivity": "No recent activity"
+  },
+  "devices": {
+    "title": "Devices",
+    "addDevice": "Add Device",
+    "searchPlaceholder": "Search devices...",
+    "name": "Name",
+    "devEui": "DevEUI",
+    "status": "Status",
+    "lastSeen": "Last Seen",
+    "model": "Model",
+    "location": "Location",
+    "viewLogs": "View Logs",
+    "editDevice": "Edit",
+    "deleteDevice": "Delete",
+    "noDevices": "No devices found",
+    "statuses": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "PENDING": "Pending",
+      "ERROR": "Error"
+    },
+    "form": {
+      "nameLabel": "Device Name",
+      "devEuiLabel": "DevEUI",
+      "modelLabel": "Model",
+      "descriptionLabel": "Description",
+      "save": "Save",
+      "cancel": "Cancel"
+    }
+  },
+  "deviceLogs": {
+    "title": "Device Logs",
+    "time": "Time",
+    "eventType": "Type",
+    "fPort": "fPort",
+    "fCnt": "fCnt",
+    "rssi": "RSSI",
+    "snr": "SNR",
+    "dataRate": "Data Rate",
+    "rawData": "Raw Data",
+    "decodedPayload": "Decoded",
+    "noLogs": "No logs available",
+    "refresh": "Refresh"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "addRule": "New Rule",
+    "rules": "Rules",
+    "events": "Events",
+    "noRules": "No rules configured",
+    "noEvents": "No alert events",
+    "acknowledge": "Acknowledge",
+    "device": "Device",
+    "channel": "Channel",
+    "operator": "Operator",
+    "threshold": "Threshold",
+    "severity": "Severity",
+    "active": "Active",
+    "severities": {
+      "INFO": "Info",
+      "WARNING": "Warning",
+      "CRITICAL": "Critical"
+    },
+    "operators": {
+      "gt": "Greater than",
+      "lt": "Less than",
+      "gte": "Greater or equal",
+      "lte": "Less or equal",
+      "eq": "Equal to"
+    }
+  },
+  "billing": {
+    "title": "Billing",
+    "currentPlan": "Current Plan",
+    "pricePerDevice": "Price per Device / Month",
+    "activeDevices": "Active Devices",
+    "estimatedBill": "Estimated Bill",
+    "invoices": "Invoices",
+    "period": "Period",
+    "amount": "Amount",
+    "status": "Status",
+    "payNow": "Pay Now",
+    "download": "Download PDF",
+    "noInvoices": "No invoices yet",
+    "statuses": {
+      "DRAFT": "Draft",
+      "PENDING": "Pending",
+      "PAID": "Paid",
+      "OVERDUE": "Overdue",
+      "VOID": "Void"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "company": "Company",
+    "notifications": "Notifications",
+    "security": "Security",
+    "name": "Full Name",
+    "email": "Email",
+    "language": "Language",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "greek": "Greek",
+    "english": "English",
+    "save": "Save Changes",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password"
+  },
+  "support": {
+    "title": "Support",
+    "faq": "FAQ",
+    "contact": "Contact",
+    "tickets": "Tickets",
+    "newTicket": "New Ticket",
+    "noTickets": "No support tickets",
+    "subject": "Subject",
+    "message": "Message",
+    "send": "Send",
+    "faqItems": [
+      {
+        "q": "How do I add a new device?",
+        "a": "Go to the Devices section and click 'Add Device'. Enter the DevEUI and device details to register it."
+      },
+      {
+        "q": "How does billing work?",
+        "a": "Billing is per active device per month based on your plan. An invoice is generated at the start of each month."
+      },
+      {
+        "q": "How do I set up alerts?",
+        "a": "In the Alerts section, create a new rule by selecting a device, channel, operator, and threshold value."
+      },
+      {
+        "q": "How do I change the language?",
+        "a": "In Profile Settings, select your preferred language from the language dropdown."
+      },
+      {
+        "q": "Where can I see raw device data?",
+        "a": "Click 'View Logs' from the device list to see all incoming messages with hex data, RSSI, SNR, and decoded payload."
+      }
+    ]
+  },
+  "admin": {
+    "overview": "Overview",
+    "totalTenants": "Total Tenants",
+    "totalDevices": "Total Devices",
+    "totalRevenue": "Total Revenue",
+    "tenants": {
+      "title": "Tenants",
+      "addTenant": "New Tenant",
+      "name": "Company Name",
+      "plan": "Plan",
+      "devices": "Devices",
+      "status": "Status",
+      "billing": "Billing",
+      "actions": "Actions"
+    },
+    "plans": {
+      "title": "Plans",
+      "addPlan": "New Plan",
+      "price": "Price/Device",
+      "maxDevices": "Max Devices"
+    },
+    "audit": {
+      "title": "Audit Log",
+      "action": "Action",
+      "entity": "Entity",
+      "user": "User",
+      "tenant": "Tenant",
+      "time": "Time"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "search": "Search",
+    "filter": "Filter",
+    "noData": "No data available",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "refresh": "Refresh",
+    "actions": "Actions",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}

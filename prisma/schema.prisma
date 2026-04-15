@@ -1,0 +1,426 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Plans ────────────────────────────────────────────────────────────────────
+
+model Plan {
+  id             String   @id @default(cuid())
+  name           String   @db.VarChar(100)
+  slug           String   @unique @db.VarChar(50)
+  pricePerDevice Decimal  @db.Decimal(8, 4)
+  maxDevices     Int?
+  features       Json
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenants        Tenant[]
+
+  @@map("plans")
+}
+
+// ─── Tenants ──────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id           String      @id @default(cuid())
+  name         String      @db.VarChar(255)
+  slug         String      @unique @db.VarChar(100)
+  planId       String?
+  plan         Plan?       @relation(fields: [planId], references: [id])
+  billingEmail String?     @db.VarChar(255)
+  isActive     Boolean     @default(true)
+
+  // ── AADE / Softone fields ────────────────────────────────────────────────
+  trdr              Int?      @unique
+  code              String?   @db.VarChar(20)
+  afm               String?   @db.VarChar(20)
+  sotitle           String?   @db.VarChar(200)
+  isprosp           Int       @default(0) @db.SmallInt
+  country           Int?
+  address           String?   @db.VarChar(200)
+  zip               String?   @db.VarChar(20)
+  district          String?   @db.VarChar(100)
+  city              String?   @db.VarChar(100)
+  area              String?   @db.VarChar(100)
+  latitude          Float?
+  longitude         Float?
+  phone01           String?   @db.VarChar(50)
+  phone02           String?   @db.VarChar(50)
+  jobtype           Int?
+  jobtypetrd        String?   @db.VarChar(100)
+  trdpgroup         Int?
+  webpage           String?   @db.VarChar(200)
+  email             String?   @db.VarChar(200)
+  emailacc          String?   @db.VarChar(200)
+  trdbusiness       Int?
+  irsdata           String?   @db.VarChar(50)
+  consent           Boolean   @default(false)
+  prjcs             Int?
+  remark            String?   @db.Text
+  registrationDate  DateTime?
+  numberOfEmployees Int?
+  gemiCode          String?   @db.VarChar(50)
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  users        User[]
+  devices      Device[]
+  dashboards   Dashboard[]
+  alertRules   AlertRule[]
+  invoices     Invoice[]
+  auditLogs    AuditLog[]
+  widgetTypes  TenantWidgetType[]
+  kads         CompanyKad[]
+  contacts     TenantContact[]
+  branches     TrdBranch[]
+
+  @@index([afm])
+  @@index([code])
+  @@map("tenants")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  CUSTOMER
+  VIEWER
+}
+
+model User {
+  id           String    @id @default(cuid())
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id])
+  email        String    @unique @db.VarChar(255)
+  name         String    @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  role         UserRole  @default(CUSTOMER)
+  locale       String    @default("el") @db.VarChar(5)
+  theme        String    @default("dark") @db.VarChar(10)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  auditLogs    AuditLog[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ─── Devices ──────────────────────────────────────────────────────────────────
+
+model Device {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  devEui        String       @db.VarChar(64)
+  appKey        String?      @db.VarChar(64)     // LoRaWAN OTAA AppKey
+  name          String       @db.VarChar(255)
+  description   String?      @db.Text
+  model         String?      @db.VarChar(100)    // e.g. "EM300-TH"
+  applicationId String?      @db.VarChar(100)    // Milesight app UUID
+  online        Boolean      @default(false)
+  lastSeenAt    DateTime?
+  battery       Int?                              // percent 0-100
+  signal        Int?                              // dBm
+  latitude      Float?
+  longitude     Float?
+  location      String?      @db.VarChar(500)    // human-readable location label
+  metadata      Json?
+  billedFrom    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  logs          DeviceLog[]
+  telemetry     Telemetry[]
+  alertRules    AlertRule[]
+  alertEvents   AlertEvent[]
+
+  @@unique([tenantId, devEui])
+  @@index([tenantId])
+  @@map("devices")
+}
+
+// ─── Device Logs ──────────────────────────────────────────────────────────────
+
+model DeviceLog {
+  id             BigInt   @id @default(autoincrement())
+  deviceId       String
+  device         Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tenantId       String
+  receivedAt     DateTime @db.DateTime(3)
+  devEui         String   @db.VarChar(64)
+  fPort          Int?
+  fCnt           Int?
+  rssi           Int?
+  snr            Decimal? @db.Decimal(5, 2)
+  dataRate       String?  @db.VarChar(20)
+  frequency      String?  @db.VarChar(20)
+  rawHex         String?  @db.Text
+  decodedPayload Json?
+  eventType      String   @default("uplink") @db.VarChar(30)
+  isDuplicate    Boolean  @default(false)
+  gatewayId      String?  @db.VarChar(100)
+  createdAt      DateTime @default(now()) @db.DateTime(3)
+
+  @@index([tenantId, receivedAt])
+  @@index([deviceId, receivedAt])
+  @@map("device_logs")
+}
+
+// ─── Telemetry ────────────────────────────────────────────────────────────────
+
+model Telemetry {
+  id        BigInt   @id @default(autoincrement())
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tenantId  String
+  ts        DateTime @db.DateTime(3)
+  channel   String   @db.VarChar(100)
+  value     String   @db.VarChar(255)   // stored as string for flexibility (parse on read)
+  unit      String?  @db.VarChar(20)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  @@index([deviceId, channel, ts])
+  @@index([tenantId, ts])
+  @@map("telemetry")
+}
+
+// ─── Dashboards ───────────────────────────────────────────────────────────────
+
+model Dashboard {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  name      String    @db.VarChar(255)
+  isDefault Boolean   @default(false)
+  layout    Json      // { cols, rowHeight, sections: [{id, name, order}] }
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  widgets   Widget[]
+
+  @@index([tenantId])
+  @@map("dashboards")
+}
+
+// ─── Widgets ──────────────────────────────────────────────────────────────────
+
+model Widget {
+  id          String    @id @default(cuid())
+  dashboardId String
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  type        String    @db.VarChar(50)
+  title       String    @db.VarChar(255)
+  config      Json      // { deviceId, channels, thresholds, sectionId, … }
+  position    Json      // { x, y, w, h, sectionId }
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("widgets")
+}
+
+// ─── Alert Rules ──────────────────────────────────────────────────────────────
+
+model AlertRule {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  deviceId    String?
+  device      Device?      @relation(fields: [deviceId], references: [id])
+  name        String       @db.VarChar(255)
+  channel     String       @db.VarChar(100)
+  operator    String       @db.VarChar(10)  // gt, lt, gte, lte, eq
+  threshold   Decimal      @db.Decimal(18, 6)
+  severity    String       @default("warning") @db.VarChar(20) // info, warning, critical
+  message     String       @db.Text
+  emailNotify Boolean      @default(true)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  events      AlertEvent[]
+
+  @@index([tenantId])
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id             String    @id @default(cuid())
+  alertRuleId    String
+  alertRule      AlertRule @relation(fields: [alertRuleId], references: [id])
+  deviceId       String
+  device         Device    @relation(fields: [deviceId], references: [id])
+  tenantId       String
+  channel        String    @db.VarChar(100)
+  value          String    @db.VarChar(255)
+  unit           String?   @db.VarChar(20)
+  acknowledged   Boolean   @default(false)
+  acknowledgedAt DateTime?
+  notifiedAt     DateTime?
+  firedAt        DateTime  @default(now())
+
+  @@index([tenantId, firedAt])
+  @@index([alertRuleId])
+  @@map("alert_events")
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  OVERDUE
+  VOID
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  periodStart    DateTime
+  periodEnd      DateTime
+  deviceCount    Int
+  pricePerDevice Decimal       @db.Decimal(8, 4)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  vat            Decimal       @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  status         InvoiceStatus @default(DRAFT)
+  vivaOrderCode  String?       @db.VarChar(100)
+  paidAt         DateTime?
+  lineItems      Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@map("invoices")
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  String?  @db.VarChar(100)
+  meta      Json?
+  ip        String?  @db.VarChar(50)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// ─── KAD / Branches / Contacts (linked to Tenant) ────────────────────────────
+
+model CompanyKad {
+  id             Int      @id @default(autoincrement())
+  tenantId       String
+  kadCode        String   @db.VarChar(20)
+  kadDescription String   @db.VarChar(500)
+  kadType        String   @db.VarChar(5)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kadCode])
+  @@index([tenantId])
+  @@index([kadCode])
+}
+
+model TrdBranch {
+  id         Int      @id @default(autoincrement())
+  tenantId   String
+  trdbranch  Int?     @unique
+  code       String?  @db.VarChar(20)
+  name       String?  @db.VarChar(200)
+  country    Int?
+  irsdata    String?  @db.VarChar(50)
+  address    String?  @db.VarChar(200)
+  areas      String?  @db.VarChar(100)
+  district   String?  @db.VarChar(100)
+  zip        String?  @db.VarChar(20)
+  latitude   Float?
+  longitude  Float?
+  phone1     String?  @db.VarChar(50)
+  phone2     String?  @db.VarChar(50)
+  email      String?  @db.VarChar(200)
+  emailacc   String?  @db.VarChar(200)
+  jobtype    Int?
+  jobtypetrd String?  @db.VarChar(100)
+  remarks    String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([trdbranch])
+}
+
+model TenantContact {
+  id         Int      @id @default(autoincrement())
+  tenantId   String
+  name       String?  @db.VarChar(200)
+  position   String?  @db.VarChar(200)
+  email      String?  @db.VarChar(200)
+  phone      String?  @db.VarChar(50)
+  mobile     String?  @db.VarChar(50)
+  address    String?  @db.VarChar(200)
+  zip        String?  @db.VarChar(20)
+  city       String?  @db.VarChar(100)
+  country    String?  @db.VarChar(100)
+  remarks    String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+// ─── Widget catalog (super-admin managed) ────────────────────────────────────
+// Master list of widget types available across the platform. New entries can
+// be added at any time (e.g. when we wire a widget for a new device model).
+
+model WidgetType {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(60)   // e.g. "stat-card", "battery-gauge"
+  name        String   @db.VarChar(120)
+  description String?  @db.VarChar(500)
+  icon        String?  @db.VarChar(60)           // lucide icon name
+  appliesTo   String   @default("*") @db.VarChar(255) // CSV of device models or "*"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantWidgets TenantWidgetType[]
+
+  @@map("widget_types")
+}
+
+// Per-tenant gating: presence of a row = enabled for that tenant.
+model TenantWidgetType {
+  id           String     @id @default(cuid())
+  tenantId     String
+  widgetTypeId String
+  createdAt    DateTime   @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  widgetType WidgetType @relation(fields: [widgetTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, widgetTypeId])
+  @@index([tenantId])
+  @@map("tenant_widget_types")
+}
