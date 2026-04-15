@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth, isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/telemetry/latest?deviceIds=id1,id2&channels=temp,humidity
 // Returns the latest reading per device+channel combination.
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = isAdmin(session.user.role);
+  if (!admin && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const deviceIdsParam = searchParams.get("deviceIds");
   const channelsParam = searchParams.get("channels");
-  const tenantId = session.user.tenantId;
 
-  // Resolve device IDs scoped to tenant
-  const deviceWhere: Record<string, unknown> = { tenantId };
+  // Tenant-scoped users see only their tenant; admins can see any device
+  const deviceWhere: Record<string, unknown> = {};
+  if (!admin) deviceWhere.tenantId = session.user.tenantId;
   if (deviceIdsParam) {
     const ids = deviceIdsParam.split(",").filter(Boolean);
     if (ids.length > 0) deviceWhere.id = { in: ids };

@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth, isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/devices/map?ids=id1,id2
 // Returns device pins with coordinates for the map widget.
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.tenantId)
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const admin = isAdmin(session.user.role);
+  if (!admin && !session.user.tenantId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const idsParam = searchParams.get("ids");
-  const tenantId = session.user.tenantId;
 
-  const where: Record<string, unknown> = { tenantId };
+  const where: Record<string, unknown> = {};
+  if (!admin) where.tenantId = session.user.tenantId;
   if (idsParam) {
     const ids = idsParam.split(",").filter(Boolean);
     if (ids.length > 0) where.id = { in: ids };
