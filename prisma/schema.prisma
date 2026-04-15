@@ -187,6 +187,7 @@ model Device {
   updatedAt     DateTime     @updatedAt
   locationId    String?
   location      Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  removedFromMilesightAt DateTime?
   logs          DeviceLog[]
   telemetry     Telemetry[]
   alertRules    AlertRule[]

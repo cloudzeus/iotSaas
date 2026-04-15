@@ -305,3 +305,84 @@ export async function syncSoftoneTrdBusinesses(
     return runUpsertTrdBusinesses(rows);
   });
 }
+
+// ─── Milesight device reconciliation ─────────────────────────────────────────
+// Compares our local assigned devices against the live Milesight inventory.
+// Local devices whose devEui no longer exists on Milesight get a non-null
+// `removedFromMilesightAt` stamp (ghost flag). If a previously-ghost device
+// reappears, the flag is cleared. Also recomputes affected tenant invoices.
+
+async function runReconcileMilesight(): Promise<SyncResult> {
+  const { searchDevices } = await import("@/lib/milesight");
+  const { recalcCurrentInvoice } = await import("@/lib/billing");
+  const start = Date.now();
+  let created = 0, updated = 0, skipped = 0;
+  const errors: SyncResult["errors"] = [];
+
+  let msContent;
+  try {
+    msContent = (await searchDevices(1, 500)).content;
+  } catch (err) {
+    return {
+      scanned: 0, created: 0, updated: 0, skipped: 1,
+      errors: [{ identifier: "milesight-api", error: err instanceof Error ? err.message : String(err) }],
+      since: "RECONCILE", until: new Date().toISOString(), durationMs: Date.now() - start,
+    };
+  }
+
+  const liveEuis = new Set(msContent.map((d) => d.devEUI.toUpperCase()));
+  const locals = await db.device.findMany({
+    select: { id: true, devEui: true, tenantId: true, removedFromMilesightAt: true },
+  });
+
+  const affectedTenants = new Set<string>();
+
+  for (const d of locals) {
+    try {
+      const isLive = liveEuis.has(d.devEui.toUpperCase());
+      if (!isLive && d.removedFromMilesightAt == null) {
+        await db.device.update({
+          where: { id: d.id },
+          data: { removedFromMilesightAt: new Date(), online: false },
+        });
+        affectedTenants.add(d.tenantId);
+        updated++;
+      } else if (isLive && d.removedFromMilesightAt != null) {
+        // Device reappeared — unset ghost flag
+        await db.device.update({
+          where: { id: d.id },
+          data: { removedFromMilesightAt: null },
+        });
+        affectedTenants.add(d.tenantId);
+        updated++;
+      }
+    } catch (err) {
+      errors.push({
+        identifier: `device=${d.devEui}`,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      skipped++;
+    }
+  }
+
+  // Billing recompute for every tenant whose ghost set changed
+  for (const tenantId of affectedTenants) {
+    await recalcCurrentInvoice(tenantId).catch((err) =>
+      console.error("[reconcile] recalc failed for", tenantId, err)
+    );
+  }
+
+  return {
+    scanned: locals.length,
+    created, updated, skipped, errors,
+    since: "RECONCILE",
+    until: new Date().toISOString(),
+    durationMs: Date.now() - start,
+  };
+}
+
+export async function reconcileMilesightDevices(
+  trigger: "manual" | "cron" | "api" = "manual"
+) {
+  return recordJob("milesight-reconcile", trigger, {}, runReconcileMilesight);
+}

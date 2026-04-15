@@ -67,7 +67,9 @@ export default function SyncSchedules({
               ? "/api/softone/sync-trdpgroups"
               : kind === "softone-trdbusinesses"
                 ? "/api/softone/sync-trdbusinesses"
-                : null;
+                : kind === "milesight-reconcile"
+                  ? "/api/admin/reconcile-milesight"
+                  : null;
         if (!endpoint) return;
         const res = await fetch(endpoint, { method: "POST" });
         const data = await res.json();

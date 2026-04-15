@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   syncSoftoneCustomers, syncSoftoneCountries, syncSoftoneTrdpGroups,
-  syncSoftoneTrdBusinesses,
+  syncSoftoneTrdBusinesses, reconcileMilesightDevices,
 } from "@/lib/softone-sync";
 
 export const runtime = "nodejs";
@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
         result = await syncSoftoneTrdpGroups("cron");
       } else if (s.kind === "softone-trdbusinesses") {
         result = await syncSoftoneTrdBusinesses("cron");
+      } else if (s.kind === "milesight-reconcile") {
+        result = await reconcileMilesightDevices("cron");
       } else {
         continue;
       }

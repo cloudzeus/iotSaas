@@ -30,7 +30,8 @@ export async function recalcCurrentInvoice(tenantId: string) {
   const { start, end } = currentMonthRange();
 
   const devices = await db.device.findMany({
-    where: { tenantId },
+    // Ghost devices (removed from Milesight) must not be billed
+    where: { tenantId, removedFromMilesightAt: null },
     select: { id: true, devEui: true, name: true, model: true, billedFrom: true },
   });
   const deviceCount = devices.length;

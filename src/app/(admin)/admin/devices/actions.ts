@@ -23,6 +23,15 @@ export interface DeviceListResult {
     lastSeenAt: Date | null;
     tenant: { id: string; name: string };
     milesight?: MilesightDevice;
+    removedFromMilesightAt: Date | null;
+  }>;
+  ghosts: Array<{
+    id: string;
+    devEui: string;
+    name: string;
+    model: string | null;
+    tenant: { id: string; name: string };
+    removedFromMilesightAt: Date;
   }>;
 }
 
@@ -40,21 +49,36 @@ export async function listAllDevicesAction(): Promise<DeviceListResult> {
   const msByEui = new Map(ms.content.map((d) => [d.devEUI.toUpperCase(), d]));
 
   const unassigned = ms.content.filter((d) => !localByEui.has(d.devEUI.toUpperCase()));
-  const assigned = local.map((d) => {
-    const live = msByEui.get(d.devEui.toUpperCase());
-    return {
+
+  const assigned = local
+    .filter((d) => d.removedFromMilesightAt == null)
+    .map((d) => {
+      const live = msByEui.get(d.devEui.toUpperCase());
+      return {
+        id: d.id,
+        devEui: d.devEui,
+        name: d.name,
+        model: d.model,
+        online: live ? live.connectStatus === "ONLINE" : d.online,
+        lastSeenAt: live?.lastUpdateTime ? new Date(live.lastUpdateTime) : d.lastSeenAt,
+        tenant: d.tenant,
+        milesight: live,
+        removedFromMilesightAt: d.removedFromMilesightAt,
+      };
+    });
+
+  const ghosts = local
+    .filter((d) => d.removedFromMilesightAt != null)
+    .map((d) => ({
       id: d.id,
       devEui: d.devEui,
       name: d.name,
       model: d.model,
-      online: live ? live.connectStatus === "ONLINE" : d.online,
-      lastSeenAt: live?.lastUpdateTime ? new Date(live.lastUpdateTime) : d.lastSeenAt,
       tenant: d.tenant,
-      milesight: live,
-    };
-  });
+      removedFromMilesightAt: d.removedFromMilesightAt!,
+    }));
 
-  return { unassigned, assigned };
+  return { unassigned, assigned, ghosts };
 }
 
 export async function assignDeviceAction(input: {

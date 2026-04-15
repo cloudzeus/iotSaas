@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FiCpu, FiBatteryCharging, FiLink, FiX, FiLoader,
-  FiSave, FiSlash, FiPlus, FiSearch, FiCheck,
+  FiSave, FiSlash, FiPlus, FiSearch, FiCheck, FiAlertTriangle,
+  FiRefreshCw,
 } from "react-icons/fi";
 
 const Cpu = FiCpu;
@@ -46,9 +47,10 @@ interface Props {
 
 export default function DevicesAdminClient({ data, tenants, locale }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"unassigned" | "assigned">(
+  const [tab, setTab] = useState<"unassigned" | "assigned" | "ghosts">(
     data.unassigned.length > 0 ? "unassigned" : "assigned"
   );
+  const [reconciling, setReconciling] = useState(false);
   const [assigning, setAssigning] = useState<{
     devEui: string; name: string; model?: string; applicationId?: string;
   } | null>(null);
@@ -81,18 +83,87 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
         </h1>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--border)", alignItems: "flex-end" }}>
         <TabBtn active={tab === "unassigned"} onClick={() => setTab("unassigned")} count={data.unassigned.length}>
           {t ? "Εκκρεμείς" : "Unassigned"}
         </TabBtn>
         <TabBtn active={tab === "assigned"} onClick={() => setTab("assigned")} count={data.assigned.length}>
           {t ? "Αντιστοιχισμένες" : "Assigned"}
         </TabBtn>
+        <TabBtn active={tab === "ghosts"} onClick={() => setTab("ghosts")} count={data.ghosts.length} danger={data.ghosts.length > 0}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <FiAlertTriangle size={12} /> {t ? "Διαγραμμένες" : "Ghost"}
+          </span>
+        </TabBtn>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ padding: "6px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 8 }}
+          disabled={reconciling}
+          onClick={async () => {
+            setReconciling(true);
+            try {
+              await fetch("/api/admin/reconcile-milesight", { method: "POST" });
+              router.refresh();
+            } finally { setReconciling(false); }
+          }}
+        >
+          {reconciling ? <FiLoader size={12} className="animate-spin" /> : <FiRefreshCw size={12} />}
+          {t ? "Συγχρονισμός Milesight" : "Reconcile Milesight"}
+        </button>
       </div>
 
       <div className="card">
         <div className="table-wrap">
-          {tab === "unassigned" ? (
+          {tab === "ghosts" ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>{t ? "Όνομα" : "Name"}</th>
+                  <th>DevEUI</th>
+                  <th>{t ? "Πελάτης" : "Tenant"}</th>
+                  <th>{t ? "Μοντέλο" : "Model"}</th>
+                  <th>{t ? "Αφαιρέθηκε" : "Removed"}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.ghosts.length === 0 ? (
+                  <tr><td colSpan={6} className={m.emptyCell}>
+                    {t
+                      ? "Καμία συσκευή δεν έχει διαγραφεί από το Milesight."
+                      : "No devices have been removed from Milesight."}
+                  </td></tr>
+                ) : data.ghosts.map((d) => (
+                  <tr key={d.devEui}>
+                    <td style={{ fontWeight: 500 }}>
+                      <span style={{ color: "var(--red)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <FiAlertTriangle size={12} /> {d.name}
+                      </span>
+                    </td>
+                    <td style={{ fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "0.85rem" }}>{d.devEui}</td>
+                    <td><span className="badge badge-orange">{d.tenant.name}</span></td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>{d.model || "—"}</td>
+                    <td style={{ color: "var(--red)", fontSize: "0.78rem" }}>
+                      {new Date(d.removedFromMilesightAt).toLocaleString(locale === "el" ? "el-GR" : "en-GB")}
+                    </td>
+                    <td>
+                      <button
+                        className="btn-ghost"
+                        style={{ padding: "4px 10px", fontSize: "0.78rem", color: "var(--red)" }}
+                        onClick={() => onUnassign(d.devEui)}
+                        disabled={pending}
+                        title={t ? "Οριστική αφαίρεση" : "Permanently unassign"}
+                      >
+                        <Unlink size={12} /> {t ? "Αφαίρεση" : "Unassign"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : tab === "unassigned" ? (
             <table>
               <thead>
                 <tr>
@@ -234,7 +305,16 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
   );
 }
 
-function TabBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
+function TabBtn({
+  active, onClick, count, children, danger,
+}: {
+  active: boolean;
+  onClick: () => void;
+  count: number;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  const activeColor = danger ? "var(--red)" : "var(--orange)";
   return (
     <button
       type="button"
@@ -243,8 +323,8 @@ function TabBtn({ active, onClick, count, children }: { active: boolean; onClick
         padding: "10px 16px",
         background: "transparent",
         border: "none",
-        borderBottom: active ? "2px solid var(--orange)" : "2px solid transparent",
-        color: active ? "var(--orange)" : "var(--text-secondary)",
+        borderBottom: active ? `2px solid ${activeColor}` : "2px solid transparent",
+        color: active ? activeColor : (danger && count > 0 ? "var(--red)" : "var(--text-secondary)"),
         cursor: "pointer",
         fontWeight: 600,
         fontSize: "0.875rem",
@@ -255,7 +335,9 @@ function TabBtn({ active, onClick, count, children }: { active: boolean; onClick
       }}
     >
       {children}
-      <span className={`badge ${active ? "badge-orange" : "badge-gray"}`}>{count}</span>
+      <span className={`badge ${
+        active ? (danger ? "badge-red" : "badge-orange") : (danger && count > 0 ? "badge-red" : "badge-gray")
+      }`}>{count}</span>
     </button>
   );
 }
