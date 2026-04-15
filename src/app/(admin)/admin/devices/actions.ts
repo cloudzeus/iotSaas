@@ -3,7 +3,7 @@
 import { auth, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { searchDevices, type MilesightDevice } from "@/lib/milesight";
+import { searchDevicesAllApps, type MilesightDeviceFromApp } from "@/lib/milesight-apps";
 import { recalcCurrentInvoice, markBilledFromNow } from "@/lib/billing";
 
 async function requireAdmin() {
@@ -13,7 +13,7 @@ async function requireAdmin() {
 }
 
 export interface DeviceListResult {
-  unassigned: MilesightDevice[];
+  unassigned: MilesightDeviceFromApp[];
   assigned: Array<{
     id: string;
     devEui: string;
@@ -22,7 +22,7 @@ export interface DeviceListResult {
     online: boolean;
     lastSeenAt: Date | null;
     tenant: { id: string; name: string };
-    milesight?: MilesightDevice;
+    milesight?: MilesightDeviceFromApp;
     removedFromMilesightAt: Date | null;
   }>;
   ghosts: Array<{
@@ -37,8 +37,8 @@ export interface DeviceListResult {
 
 export async function listAllDevicesAction(): Promise<DeviceListResult> {
   await requireAdmin();
-  const [ms, local] = await Promise.all([
-    searchDevices(1, 200).catch(() => ({ content: [], total: 0, pageNumber: 1, pageSize: 200 })),
+  const [msContent, local] = await Promise.all([
+    searchDevicesAllApps().catch(() => [] as MilesightDeviceFromApp[]),
     db.device.findMany({
       include: { tenant: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
@@ -46,9 +46,9 @@ export async function listAllDevicesAction(): Promise<DeviceListResult> {
   ]);
 
   const localByEui = new Map(local.map((d) => [d.devEui.toUpperCase(), d]));
-  const msByEui = new Map(ms.content.map((d) => [d.devEUI.toUpperCase(), d]));
+  const msByEui = new Map(msContent.map((d) => [d.devEUI.toUpperCase(), d]));
 
-  const unassigned = ms.content.filter((d) => !localByEui.has(d.devEUI.toUpperCase()));
+  const unassigned = msContent.filter((d) => !localByEui.has(d.devEUI.toUpperCase()));
 
   const assigned = local
     .filter((d) => d.removedFromMilesightAt == null)
@@ -112,7 +112,9 @@ export async function assignDeviceAction(input: {
   await db.auditLog.create({
     data: {
       tenantId: input.tenantId,
-      userId: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
+      userId: session.user.id
+        ? (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } }))?.id ?? null
+        : null,
       action: "ASSIGN_DEVICE",
       entity: "Device",
       entityId: devEui,
@@ -137,7 +139,9 @@ export async function unassignDeviceAction(devEui: string): Promise<void> {
   await db.auditLog.create({
     data: {
       tenantId,
-      userId: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
+      userId: session.user.id
+        ? (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } }))?.id ?? null
+        : null,
       action: "UNASSIGN_DEVICE",
       entity: "Device",
       entityId: dev.id,

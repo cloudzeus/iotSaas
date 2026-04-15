@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { searchDevicesAllApps } from "@/lib/milesight-apps";
 import DevicesClient from "./DevicesClient";
 
 export const metadata = { title: "Devices" };
@@ -11,7 +12,7 @@ export default async function DevicesPage() {
 
   const tenantId = session.user.tenantId;
 
-  const [devices, channelRows] = await Promise.all([
+  const [devices, channelRows, msContent] = await Promise.all([
     prisma.device.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
@@ -23,7 +24,10 @@ export default async function DevicesPage() {
       orderBy: { ts: "desc" },
       take: 2000,
     }),
+    searchDevicesAllApps().catch(() => []),
   ]);
+
+  const liveByEui = new Map(msContent.map((d) => [d.devEUI.toUpperCase(), d]));
 
   const channelsByDevice = new Map<string, string[]>();
   for (const row of channelRows) {
@@ -32,10 +36,15 @@ export default async function DevicesPage() {
     channelsByDevice.set(row.deviceId, arr);
   }
 
-  const devicesWithChannels = devices.map((d) => ({
-    ...d,
-    channels: channelsByDevice.get(d.id) ?? [],
-  }));
+  const devicesWithChannels = devices.map((d) => {
+    const live = liveByEui.get(d.devEui.toUpperCase());
+    return {
+      ...d,
+      online: live ? live.connectStatus === "ONLINE" : d.online,
+      lastSeenAt: live?.lastUpdateTime ? new Date(live.lastUpdateTime) : d.lastSeenAt,
+      channels: channelsByDevice.get(d.id) ?? [],
+    };
+  });
 
   return (
     <DevicesClient

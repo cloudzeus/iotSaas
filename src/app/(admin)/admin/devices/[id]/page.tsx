@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
-import { searchDevices } from "@/lib/milesight";
+import { searchDevicesAllApps } from "@/lib/milesight-apps";
 import DeviceDetailAdminClient from "./DeviceDetailAdminClient";
 
 export const metadata = { title: "Device Detail" };
@@ -16,7 +16,7 @@ export default async function AdminDeviceDetailPage({ params }: Params) {
     redirect("/dashboard");
   }
 
-  const [device, widgetTypes, channelsRaw, msResult] = await Promise.all([
+  const [device, widgetTypes, channelsRaw, msContent] = await Promise.all([
     db.device.findUnique({
       where: { id },
       include: { tenant: { select: { id: true, name: true } } },
@@ -28,12 +28,12 @@ export default async function AdminDeviceDetailPage({ params }: Params) {
       _count: { _all: true },
       _max: { ts: true },
     }),
-    searchDevices(1, 200).catch(() => ({ content: [], total: 0, pageNumber: 1, pageSize: 200 })),
+    searchDevicesAllApps().catch(() => []),
   ]);
 
   if (!device) notFound();
 
-  const live = msResult.content.find(
+  const live = msContent.find(
     (d) => d.devEUI.toUpperCase() === device.devEui.toUpperCase()
   );
 

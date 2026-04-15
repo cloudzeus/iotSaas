@@ -313,7 +313,7 @@ export async function syncSoftoneTrdBusinesses(
 // reappears, the flag is cleared. Also recomputes affected tenant invoices.
 
 async function runReconcileMilesight(): Promise<SyncResult> {
-  const { searchDevices } = await import("@/lib/milesight");
+  const { searchDevicesAllApps } = await import("@/lib/milesight-apps");
   const { recalcCurrentInvoice } = await import("@/lib/billing");
   const start = Date.now();
   let created = 0, updated = 0, skipped = 0;
@@ -321,7 +321,7 @@ async function runReconcileMilesight(): Promise<SyncResult> {
 
   let msContent;
   try {
-    msContent = (await searchDevices(1, 500)).content;
+    msContent = await searchDevicesAllApps();
   } catch (err) {
     return {
       scanned: 0, created: 0, updated: 0, skipped: 1,

@@ -85,6 +85,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.locale   = user.locale;
         token.theme    = user.theme;
       }
+      // Backfill from DB if stale token is missing id (older session cookie)
+      if (!token.id && token.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email as string },
+          select: { id: true, role: true, tenantId: true, locale: true, theme: true },
+        });
+        if (dbUser) {
+          token.id       = dbUser.id;
+          token.role     = dbUser.role;
+          token.tenantId = dbUser.tenantId;
+          token.locale   = dbUser.locale;
+          token.theme    = dbUser.theme;
+        }
+      }
       return token;
     },
     async session({ session, token }) {

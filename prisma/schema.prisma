@@ -488,6 +488,26 @@ model TrdBusiness {
   @@map("trd_businesses")
 }
 
+// ─── Milesight applications (multi-app support) ──────────────────────────────
+// One row per Milesight OpenAPI Application. Devices are discovered across
+// all active apps; webhook validation picks the matching app by
+// X-MSC-Webhook-UUID header.
+
+model MilesightApp {
+  id            String   @id @default(cuid())
+  name          String   @db.VarChar(120)
+  baseUrl       String   @default("https://eu-openapi.milesight.com") @db.VarChar(255)
+  clientId      String   @unique @db.VarChar(100)
+  clientSecret  String   @db.VarChar(255)
+  uuid          String?  @db.VarChar(100)
+  webhookSecret String?  @db.VarChar(255)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("milesight_apps")
+}
+
 // ─── Sync schedule (super-admin configurable) ────────────────────────────────
 
 model SyncSchedule {

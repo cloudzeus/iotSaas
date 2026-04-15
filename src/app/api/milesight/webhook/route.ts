@@ -4,6 +4,7 @@ import {
   validateMscSignature,
   type MilesightWebhookEvent,
 } from "@/lib/milesight";
+import { findAppByWebhookUuid, validateAppWebhookSignature } from "@/lib/milesight-apps";
 import { sendAlertEmail } from "@/lib/mail";
 
 export const runtime = "nodejs";
@@ -24,12 +25,21 @@ export async function POST(req: NextRequest) {
     nonce: req.headers.get("x-msc-request-nonce") ?? "",
     uuid: req.headers.get("x-msc-webhook-uuid") ?? "",
   };
-  if (sig.signature) {
+  // Look up which Milesight app this webhook belongs to (by UUID header).
+  const app = await findAppByWebhookUuid(sig.uuid);
+  if (app) {
+    console.log(`[milesight webhook] matched app "${app.name}" (uuid=${sig.uuid})`);
+    if (sig.signature) {
+      const r = validateAppWebhookSignature(app, rawBody, sig.signature);
+      if (!r.ok) console.warn(`[milesight webhook] per-app signature mismatch for "${app.name}" — fail-open`);
+    }
+  } else if (sig.signature) {
+    // Fallback to legacy single-app signature validation (env-based)
     const result = validateMscSignature(rawBody, sig);
     if (result.ok) {
-      console.log(`[milesight webhook] signature OK (format #${result.matchedFormat})`);
+      console.log(`[milesight webhook] (legacy env) signature OK (format #${result.matchedFormat})`);
     } else {
-      console.warn("[milesight webhook] signature did NOT match any candidate format — fail-open until we know the correct one");
+      console.warn(`[milesight webhook] no matching app for uuid=${sig.uuid} and legacy signature did not match — fail-open`);
     }
   }
 
