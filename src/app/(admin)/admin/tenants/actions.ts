@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { sendUserInviteEmail } from "@/lib/email";
+import { recalcCurrentInvoice, markBilledFromNow } from "@/lib/billing";
 
 async function requireAdmin() {
   const session = await auth();
@@ -73,6 +74,14 @@ export async function assignDeviceToTenantAction(input: {
       meta: { devEui },
     },
   });
+
+  // Billing: mark any unbilled devices as billed-from-now and recompute the
+  // current-month invoice so the tenant has a live pending charge.
+  await markBilledFromNow(input.tenantId);
+  await recalcCurrentInvoice(input.tenantId).catch((err) =>
+    console.error("[billing] recalc failed:", err)
+  );
+
   revalidatePath("/admin/tenants");
   revalidatePath("/admin/devices");
 }

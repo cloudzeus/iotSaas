@@ -4,6 +4,7 @@ import { auth, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { searchDevices, type MilesightDevice } from "@/lib/milesight";
+import { recalcCurrentInvoice, markBilledFromNow } from "@/lib/billing";
 
 async function requireAdmin() {
   const session = await auth();
@@ -95,6 +96,11 @@ export async function assignDeviceAction(input: {
     },
   });
 
+  await markBilledFromNow(input.tenantId);
+  await recalcCurrentInvoice(input.tenantId).catch((err) =>
+    console.error("[billing] recalc failed:", err)
+  );
+
   revalidatePath("/admin/devices");
 }
 
@@ -102,15 +108,21 @@ export async function unassignDeviceAction(devEui: string): Promise<void> {
   const session = await requireAdmin();
   const dev = await db.device.findFirst({ where: { devEui: devEui.toUpperCase() } });
   if (!dev) return;
+  const tenantId = dev.tenantId;
   await db.device.delete({ where: { id: dev.id } });
   await db.auditLog.create({
     data: {
-      tenantId: dev.tenantId,
+      tenantId,
       userId: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
       action: "UNASSIGN_DEVICE",
       entity: "Device",
       entityId: dev.id,
     },
   });
+
+  await recalcCurrentInvoice(tenantId).catch((err) =>
+    console.error("[billing] recalc failed:", err)
+  );
+
   revalidatePath("/admin/devices");
 }
