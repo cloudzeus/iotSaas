@@ -190,6 +190,73 @@ export async function fetchAllCustomers(): Promise<S1Customer[]> {
   return rows.map(mapBrowserRowToCustomer).filter((c) => c.trdr || c.afm || c.code);
 }
 
+// ─── Generic GetTable wrapper ───────────────────────────────────────────────
+
+/** Low-level GetTable call that handles SoftOne's wrapped response shape. */
+export async function s1GetTable<T extends Record<string, unknown>>(opts: {
+  table: string;
+  fields: string;
+  filter: string;
+  mapRow?: (r: Record<string, unknown>) => T;
+}): Promise<T[]> {
+  const session = await getSession();
+  const req = {
+    clientId: session.clientID,
+    appId: Number(APP_ID),
+    version: "1",
+    service: "GetTable",
+    TABLE: opts.table,
+    FIELDS: opts.fields,
+    FILTER: opts.filter,
+  };
+  const res = await s1Fetch<Record<string, unknown>>(req);
+  if (!res.success) {
+    throw new Error(`SoftOne GetTable(${opts.table}) failed: ${res.error ?? JSON.stringify(res)}`);
+  }
+  const rowsRaw = (res.data ?? res.rows ?? []) as unknown;
+  if (!Array.isArray(rowsRaw) || rowsRaw.length === 0) return [];
+
+  let fields: string[] = [];
+  const model = res.model as unknown;
+  if (Array.isArray(model)) {
+    const meta = Array.isArray(model[0]) ? (model[0] as Array<{ name: string }>) : (model as Array<{ name: string }>);
+    fields = meta.map((f) => f.name);
+  }
+
+  const rows: Record<string, unknown>[] = Array.isArray(rowsRaw[0])
+    ? (rowsRaw as unknown[][]).map((arr) => {
+        const obj: Record<string, unknown> = {};
+        fields.forEach((k, i) => { obj[k] = arr[i]; });
+        return obj;
+      })
+    : (rowsRaw as Record<string, unknown>[]);
+
+  return opts.mapRow ? rows.map(opts.mapRow) : (rows as T[]);
+}
+
+// ─── Countries ──────────────────────────────────────────────────────────────
+
+export interface S1Country {
+  country: number;
+  name: string;
+  shortcut: string | null;
+  intecode: string | null;
+}
+
+export async function fetchAllCountries(): Promise<S1Country[]> {
+  return s1GetTable<S1Country>({
+    table: "country",
+    fields: "country,name,shortcut,intecode",
+    filter: "isactive=1",
+    mapRow: (r) => ({
+      country: Number(r.country ?? r.COUNTRY ?? 0),
+      name: String(r.name ?? r.NAME ?? ""),
+      shortcut: r.shortcut ? String(r.shortcut) : null,
+      intecode: r.intecode ? String(r.intecode) : null,
+    }),
+  }).then((rows) => rows.filter((c) => c.country > 0 && c.name));
+}
+
 /** Fetch customers touched in [since, until]. */
 export async function fetchCustomersByDateRange(
   since: Date,

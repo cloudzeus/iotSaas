@@ -422,6 +422,37 @@ model TrdBranch {
   @@index([trdbranch])
 }
 
+// ─── Reference data (synced from SoftOne) ────────────────────────────────────
+
+model Country {
+  id        Int      @id @default(autoincrement())
+  country   Int      @unique
+  name      String   @db.VarChar(100)
+  shortcut  String?  @db.VarChar(10)
+  intecode  String?  @db.VarChar(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@map("countries")
+}
+
+// ─── Sync schedule (super-admin configurable) ────────────────────────────────
+
+model SyncSchedule {
+  id          String    @id @default(cuid())
+  kind        String    @unique @db.VarChar(60)   // e.g. "softone-customers"
+  label       String    @db.VarChar(120)
+  intervalMin Int       @default(15)              // minutes between runs (1-1440)
+  enabled     Boolean   @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("sync_schedules")
+}
+
 model SyncJob {
   id         String    @id @default(cuid())
   kind       String    @db.VarChar(60)   // e.g. "softone-customers-full"

@@ -10,6 +10,16 @@ import {
 } from "react-icons/fi";
 
 const MiniMapPicker = dynamic(() => import("@/components/devices/MiniMapPicker"), { ssr: false });
+
+/** Resolve a stored country value (either int code or free-text) to a display name. */
+function countryName(stored: string, countries: CountryOpt[]): string {
+  const asNum = Number(stored);
+  if (!isNaN(asNum)) {
+    const hit = countries.find((c) => c.country === asNum);
+    if (hit) return hit.name;
+  }
+  return stored;
+}
 import {
   saveLocationAction, deleteLocationAction, setMainLocationAction,
   type LocationInput,
@@ -30,15 +40,18 @@ interface Loc {
   _count: { devices: number };
 }
 
+interface CountryOpt { country: number; name: string; shortcut: string | null; }
+
 interface Props {
   tenantId: string;
   tenantName: string;
   customerAddress: string;
   locations: Loc[];
+  countries: CountryOpt[];
   locale: string;
 }
 
-export default function LocationsClient({ tenantId, tenantName, customerAddress, locations, locale }: Props) {
+export default function LocationsClient({ tenantId, tenantName, customerAddress, locations, countries, locale }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<Loc | "new" | null>(null);
   const [pending, start] = useTransition();
@@ -163,7 +176,7 @@ export default function LocationsClient({ tenantId, tenantName, customerAddress,
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
                 {loc.address && <div>{loc.address}</div>}
                 {(loc.zip || loc.city) && <div>{[loc.zip, loc.city].filter(Boolean).join(" ")}</div>}
-                {loc.country && <div>{loc.country}</div>}
+                {loc.country && <div>{countryName(loc.country, countries)}</div>}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.72rem", color: "var(--text-muted)", paddingTop: 8, borderTop: "1px solid var(--border)" }}>
@@ -190,6 +203,7 @@ export default function LocationsClient({ tenantId, tenantName, customerAddress,
         <LocationModal
           tenantId={tenantId}
           initial={editing === "new" ? null : editing}
+          countries={countries}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); router.refresh(); }}
           t={t}
@@ -200,10 +214,11 @@ export default function LocationsClient({ tenantId, tenantName, customerAddress,
 }
 
 function LocationModal({
-  tenantId, initial, onClose, onSaved, t,
+  tenantId, initial, countries, onClose, onSaved, t,
 }: {
   tenantId: string;
   initial: Loc | null;
+  countries: CountryOpt[];
   onClose: () => void;
   onSaved: () => void;
   t: boolean;
@@ -288,7 +303,18 @@ function LocationModal({
               </div>
               <div className={`${m.field} ${m.span2}`}>
                 <label className="label">{t ? "Χώρα" : "Country"}</label>
-                <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+                <select
+                  className="input"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                >
+                  <option value="">— {t ? "επιλέξτε" : "select"} —</option>
+                  {countries.map((c) => (
+                    <option key={c.country} value={String(c.country)}>
+                      {c.name}{c.shortcut ? ` (${c.shortcut})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className={m.field}>
                 <label className="label">Lat</label>

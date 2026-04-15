@@ -15,13 +15,19 @@ export default async function TenantLocationsPage({ params }: Params) {
     redirect("/dashboard");
   }
 
-  const tenant = await db.tenant.findUnique({
-    where: { id: tenantId },
-    include: {
-      locations: { orderBy: [{ isMain: "desc" }, { name: "asc" }], include: { _count: { select: { devices: true } } } },
-      customer: { select: { name: true, address: true, city: true, zip: true } },
-    },
-  });
+  const [tenant, countries] = await Promise.all([
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        locations: { orderBy: [{ isMain: "desc" }, { name: "asc" }], include: { _count: { select: { devices: true } } } },
+        customer: { select: { name: true, address: true, city: true, zip: true } },
+      },
+    }),
+    db.country.findMany({
+      orderBy: { name: "asc" },
+      select: { country: true, name: true, shortcut: true },
+    }),
+  ]);
   if (!tenant) notFound();
 
   return (
@@ -30,6 +36,7 @@ export default async function TenantLocationsPage({ params }: Params) {
       tenantName={tenant.name}
       customerAddress={[tenant.customer.address, tenant.customer.zip, tenant.customer.city].filter(Boolean).join(", ")}
       locations={JSON.parse(JSON.stringify(tenant.locations))}
+      countries={countries}
       locale={session.user.locale}
     />
   );

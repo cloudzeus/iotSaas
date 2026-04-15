@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import {
   fetchAllCustomers,
   fetchCustomersByDateRange,
+  fetchAllCountries,
   type S1Customer,
+  type S1Country,
 } from "@/lib/softone";
 
 async function findExistingCustomer(c: S1Customer) {
@@ -142,5 +144,55 @@ export async function fullSyncSoftoneCustomers(
     const until = new Date();
     const rows = await fetchAllCustomers();
     return runUpsert(rows, "ALL", until.toISOString());
+  });
+}
+
+// ─── Countries ──────────────────────────────────────────────────────────────
+
+async function runUpsertCountries(rows: S1Country[]): Promise<SyncResult> {
+  const start = Date.now();
+  let created = 0, updated = 0, skipped = 0;
+  const errors: SyncResult["errors"] = [];
+
+  for (const c of rows) {
+    try {
+      const data = {
+        country: c.country,
+        name: c.name,
+        shortcut: c.shortcut,
+        intecode: c.intecode,
+      };
+      const existing = await db.country.findUnique({ where: { country: c.country } });
+      if (existing) {
+        await db.country.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await db.country.create({ data });
+        created++;
+      }
+    } catch (err) {
+      errors.push({
+        identifier: `country=${c.country}`,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      skipped++;
+    }
+  }
+
+  return {
+    scanned: rows.length,
+    created, updated, skipped, errors,
+    since: "ALL",
+    until: new Date().toISOString(),
+    durationMs: Date.now() - start,
+  };
+}
+
+export async function syncSoftoneCountries(
+  trigger: "manual" | "cron" | "api" = "manual"
+) {
+  return recordJob("softone-countries", trigger, {}, async () => {
+    const rows = await fetchAllCountries();
+    return runUpsertCountries(rows);
   });
 }
