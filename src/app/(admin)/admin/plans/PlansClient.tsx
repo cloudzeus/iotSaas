@@ -3,9 +3,25 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
-  BookOpen, Plus, Pencil, Trash2, MoreHorizontal, Check, X,
-  Loader2, Save, AlertCircle, Users, Server, Sparkles,
-} from "lucide-react";
+  FiBookOpen, FiPlus, FiEdit2, FiTrash2, FiMoreHorizontal, FiCheck, FiX,
+  FiLoader, FiSave, FiAlertCircle, FiUsers, FiServer, FiZap, FiBell, FiMail,
+} from "react-icons/fi";
+
+const BookOpen = FiBookOpen;
+const Plus = FiPlus;
+const Pencil = FiEdit2;
+const Trash2 = FiTrash2;
+const MoreHorizontal = FiMoreHorizontal;
+const Check = FiCheck;
+const X = FiX;
+const Loader2 = FiLoader;
+const Save = FiSave;
+const AlertCircle = FiAlertCircle;
+const Users = FiUsers;
+const Server = FiServer;
+const Sparkles = FiZap;
+const Bell = FiBell;
+const Mail = FiMail;
 import { formatCurrency } from "@/lib/utils";
 import {
   savePlanAction, togglePlanAction, deletePlanAction, type PlanInput,
@@ -15,7 +31,8 @@ import s from "@/components/plans/plans.module.css";
 
 interface Plan {
   id: string; name: string; slug: string; pricePerDevice: number;
-  maxDevices: number | null; features: string[]; isActive: boolean;
+  maxDevices: number | null; maxAlertsPerDevice: number | null;
+  features: string[]; isActive: boolean;
   _count: { tenants: number };
 }
 
@@ -111,6 +128,27 @@ export default function PlansClient({ plans, locale }: Props) {
                   ? `${t ? "Έως" : "Up to"} ${plan.maxDevices} ${t ? "συσκευές" : "devices"}`
                   : (t ? "Απεριόριστες συσκευές" : "Unlimited devices")}
               </div>
+              <div className={s.devices}>
+                <Bell size={14} />
+                {plan.maxAlertsPerDevice != null
+                  ? (
+                    <span>
+                      {t ? "Μέγ. ειδοποιήσεις" : "Max alerts"}: <strong>{plan.maxAlertsPerDevice}</strong>
+                      <span style={{ color: "var(--text-muted)", marginLeft: 4 }}>
+                        / {t ? "συσκευή" : "device"} / {t ? "μήνα" : "month"}
+                      </span>
+                    </span>
+                  )
+                  : (t ? "Απεριόριστες ειδοποιήσεις" : "Unlimited alerts")}
+              </div>
+              {plan.maxAlertsPerDevice != null && (
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: -6, marginBottom: 14, display: "flex", alignItems: "center", gap: 4, paddingLeft: 22 }}>
+                  <Mail size={10} />
+                  {t
+                    ? `× συνδρομητές ειδοποιήσεων = σύνολο emails/συσκευή`
+                    : `× alert subscribers = total emails/device`}
+                </div>
+              )}
 
               <ul className={s.features}>
                 {plan.features.map((f, i) => (
@@ -176,6 +214,9 @@ function PlanForm({
   const [maxDevices, setMaxDevices] = useState(
     initial?.maxDevices != null ? String(initial.maxDevices) : ""
   );
+  const [maxAlertsPerDevice, setMaxAlertsPerDevice] = useState(
+    initial?.maxAlertsPerDevice != null ? String(initial.maxAlertsPerDevice) : ""
+  );
   const [features, setFeatures] = useState<string[]>(initial?.features ?? [""]);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [error, setError] = useState<string | null>(null);
@@ -190,6 +231,7 @@ function PlanForm({
       slug,
       pricePerDevice: Number(price),
       maxDevices: maxDevices.trim() ? Number(maxDevices) : null,
+      maxAlertsPerDevice: maxAlertsPerDevice.trim() ? Number(maxAlertsPerDevice) : null,
       features,
       isActive,
     };
@@ -250,6 +292,22 @@ function PlanForm({
               placeholder={t ? "κενό = απεριόριστες" : "empty = unlimited"}
               onChange={(e) => setMaxDevices(e.target.value)}
             />
+          </div>
+          <div className={`${m.field} ${m.span2}`}>
+            <label className="label">{t ? "Μέγ. ειδοποιήσεις / συσκευή / μήνα" : "Max alerts / device / month"}</label>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              value={maxAlertsPerDevice}
+              placeholder={t ? "κενό = απεριόριστες" : "empty = unlimited"}
+              onChange={(e) => setMaxAlertsPerDevice(e.target.value)}
+            />
+            <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 4 }}>
+              {t
+                ? "Πολλαπλασιάζεται με τον αριθμό χρηστών που λαμβάνουν ειδοποιήσεις"
+                : "Multiplied by the number of alert-subscribed users"}
+            </div>
           </div>
           <label className={`${m.checkboxRow} ${m.span4}`}>
             <input

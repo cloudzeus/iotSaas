@@ -4,12 +4,13 @@ import { useState } from "react";
 import { WIDGET_DEFAULTS } from "./types";
 import type { WidgetType, WidgetConfig } from "./types";
 import WidgetConfigModal from "./WidgetConfigModal";
+import {
+  FiX, FiHash, FiTrendingUp, FiMap, FiGrid, FiBell, FiList,
+  FiBarChart2, FiActivity, FiPieChart,
+} from "react-icons/fi";
+import { LuGauge } from "react-icons/lu";
 
-interface Device {
-  id: string;
-  name: string;
-  channels: string[];
-}
+interface Device { id: string; name: string; channels: string[]; }
 
 interface AddWidgetPanelProps {
   sectionId: string;
@@ -18,19 +19,32 @@ interface AddWidgetPanelProps {
   onClose: () => void;
 }
 
-const WIDGET_GROUPS: { emoji: string; label: string; types: WidgetType[] }[] = [
-  { emoji: "🔢", label: "Numeric",     types: ["gauge", "stat-card"] },
-  { emoji: "📈", label: "Charts",      types: ["line-chart", "area-chart", "bar-chart"] },
-  { emoji: "🗺️", label: "Spatial",     types: ["map", "device-grid"] },
-  { emoji: "📋", label: "Data tables", types: ["telemetry-table", "alert-summary"] },
+interface WidgetMeta {
+  icon: React.ComponentType<{ size?: number }>;
+  color: string;           // ring color + faint bg
+  description: string;
+}
+
+const META: Record<WidgetType, WidgetMeta> = {
+  "gauge":           { icon: LuGauge,       color: "#ff6600", description: "Radial gauge with color thresholds" },
+  "stat-card":       { icon: FiHash,        color: "#3b82f6", description: "Large numeric value with trend" },
+  "line-chart":      { icon: FiActivity,    color: "#22c55e", description: "Time-series line chart" },
+  "area-chart":      { icon: FiTrendingUp,  color: "#8b5cf6", description: "Filled area time-series" },
+  "bar-chart":       { icon: FiBarChart2,   color: "#f59e0b", description: "Categorical bar chart" },
+  "map":             { icon: FiMap,         color: "#0ea5e9", description: "Device pins on a map" },
+  "device-grid":     { icon: FiGrid,        color: "#14b8a6", description: "Status cards per device" },
+  "telemetry-table": { icon: FiList,        color: "#64748b", description: "Tabular telemetry rows" },
+  "alert-summary":   { icon: FiBell,        color: "#ef4444", description: "Recent alerts summary" },
+};
+
+const GROUPS: { label: string; icon: React.ComponentType<{ size?: number }>; types: WidgetType[] }[] = [
+  { label: "Numeric",     icon: FiHash,       types: ["gauge", "stat-card"] },
+  { label: "Charts",      icon: FiPieChart,   types: ["line-chart", "area-chart", "bar-chart"] },
+  { label: "Spatial",     icon: FiMap,        types: ["map", "device-grid"] },
+  { label: "Data tables", icon: FiList,       types: ["telemetry-table", "alert-summary"] },
 ];
 
-export default function AddWidgetPanel({
-  sectionId,
-  devices,
-  onAdd,
-  onClose,
-}: AddWidgetPanelProps) {
+export default function AddWidgetPanel({ sectionId, devices, onAdd, onClose }: AddWidgetPanelProps) {
   const [selectedType, setSelectedType] = useState<WidgetType | null>(null);
 
   if (selectedType) {
@@ -50,189 +64,150 @@ export default function AddWidgetPanel({
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 900,
-        background: "rgba(0,0,0,0.6)",
+        position: "fixed", inset: 0, zIndex: 900,
+        background: "rgba(0,0,0,0.55)",
         backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "40px 16px", overflowY: "auto",
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         style={{
-          background: "var(--card)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 16,
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
           width: "100%",
-          maxWidth: 620,
-          maxHeight: "80vh",
-          overflow: "auto",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+          maxWidth: 720,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: "18px 22px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            position: "sticky",
-            top: 0,
-            background: "var(--card)",
-            zIndex: 1,
-          }}
-        >
+        <div style={{
+          padding: "16px 22px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "var(--bg-card)",
+        }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Add widget</h2>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-muted)" }}>
-              Choose a widget type to add to this section
-            </p>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
+              Add widget
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+              Choose a widget type for this section
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close"
             style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              fontSize: 22,
-              cursor: "pointer",
+              background: "transparent", border: "none", cursor: "pointer",
+              color: "var(--text-muted)", padding: 8, borderRadius: 6,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              transition: "color 0.15s, background 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)";
+              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-elevated)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
             }}
           >
-            ×
+            <FiX size={18} />
           </button>
         </div>
 
-        {/* Widget grid */}
-        <div style={{ padding: 22 }}>
-          {WIDGET_GROUPS.map((group) => (
-            <div key={group.label} style={{ marginBottom: 24 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.07em",
-                  marginBottom: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                {group.emoji} {group.label}
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: 10,
-                }}
-              >
-                {group.types.map((type) => {
-                  const def = WIDGET_DEFAULTS[type];
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => setSelectedType(type)}
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 10,
-                        padding: "14px 12px",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                        transition: "all 0.15s",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.border =
-                          "1px solid #ff660050";
-                        (e.currentTarget as HTMLButtonElement).style.background =
-                          "rgba(255,102,0,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.border =
-                          "1px solid rgba(255,255,255,0.08)";
-                        (e.currentTarget as HTMLButtonElement).style.background =
-                          "rgba(255,255,255,0.03)";
-                      }}
-                    >
-                      {/* Preview grid size */}
-                      <div
+        <div style={{ padding: 22, maxHeight: "70vh", overflowY: "auto" }}>
+          {GROUPS.map((group) => {
+            const GroupIcon = group.icon;
+            return (
+              <div key={group.label} style={{ marginBottom: 22 }}>
+                <div
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                    textTransform: "uppercase", letterSpacing: "0.08em",
+                    marginBottom: 10, display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <GroupIcon size={12} /> {group.label}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {group.types.map((type) => {
+                    const def = WIDGET_DEFAULTS[type];
+                    const meta = META[type];
+                    const Icon = meta.icon;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setSelectedType(type)}
                         style={{
-                          width: "100%",
-                          height: 50,
-                          background: "rgba(255,102,0,0.06)",
-                          borderRadius: 6,
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 10,
+                          padding: 14,
+                          cursor: "pointer",
+                          textAlign: "left",
                           display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          position: "relative",
-                          overflow: "hidden",
+                          flexDirection: "column",
+                          gap: 10,
+                          transition: "border-color 0.15s, transform 0.1s, box-shadow 0.15s",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = meta.color;
+                          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 6px 16px ${meta.color}25`;
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
+                          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
                         }}
                       >
-                        {/* Faint grid dots */}
                         <div
                           style={{
-                            position: "absolute",
-                            inset: 0,
-                            backgroundImage:
-                              "radial-gradient(circle, rgba(255,102,0,0.2) 1px, transparent 1px)",
-                            backgroundSize: "12px 12px",
+                            width: 44, height: 44, borderRadius: 10,
+                            background: `${meta.color}15`,
+                            color: meta.color,
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
                           }}
-                        />
-                        <span style={{ fontSize: 22, position: "relative" }}>
-                          {WidgetPreviewIcon[type]}
-                        </span>
-                      </div>
-
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{def.label}</span>
-                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {WidgetDescriptions[type]}
-                      </span>
-                      <span style={{ fontSize: 10, color: "rgba(255,102,0,0.7)" }}>
-                        Default {def.w}×{def.h} cols
-                      </span>
-                    </button>
-                  );
-                })}
+                        >
+                          <Icon size={22} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+                            {def.label}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.4 }}>
+                            {meta.description}
+                          </div>
+                        </div>
+                        <div style={{
+                          fontSize: 10, fontWeight: 600, color: meta.color,
+                          background: `${meta.color}12`,
+                          padding: "3px 8px", borderRadius: 12, alignSelf: "flex-start",
+                        }}>
+                          {def.w}×{def.h}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
-
-const WidgetPreviewIcon: Record<WidgetType, string> = {
-  "gauge":           "🔵",
-  "stat-card":       "🔢",
-  "line-chart":      "📈",
-  "area-chart":      "📊",
-  "bar-chart":       "📉",
-  "map":             "🗺️",
-  "device-grid":     "🖥️",
-  "telemetry-table": "📋",
-  "alert-summary":   "🔔",
-};
-
-const WidgetDescriptions: Record<WidgetType, string> = {
-  "gauge":           "Circular gauge with colour thresholds",
-  "stat-card":       "Large value with optional trend arrow",
-  "line-chart":      "Time series with multiple channels",
-  "area-chart":      "Filled area time series chart",
-  "bar-chart":       "Bar chart with threshold colouring",
-  "map":             "Device pins on an interactive map",
-  "device-grid":     "Live status cards for each device",
-  "telemetry-table": "Latest readings from all channels",
-  "alert-summary":   "Unacknowledged alerts with severity",
-};

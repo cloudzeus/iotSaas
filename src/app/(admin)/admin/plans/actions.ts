@@ -10,6 +10,7 @@ export interface PlanInput {
   slug: string;
   pricePerDevice: number;
   maxDevices: number | null;
+  maxAlertsPerDevice: number | null;
   features: string[];
   isActive: boolean;
 }
@@ -36,6 +37,7 @@ export async function savePlanAction(input: PlanInput): Promise<{ id: string }> 
     slug,
     pricePerDevice: input.pricePerDevice,
     maxDevices: input.maxDevices,
+    maxAlertsPerDevice: input.maxAlertsPerDevice,
     features: input.features.filter((f) => f.trim().length > 0),
     isActive: input.isActive,
   };

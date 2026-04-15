@@ -19,6 +19,14 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success)
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true } });
+  if (!user) {
+    return NextResponse.json(
+      { error: "Session user no longer exists — please log in again" },
+      { status: 401 }
+    );
+  }
+
   const updated = await prisma.user.update({
     where: { id: session.user.id },
     data: parsed.data,

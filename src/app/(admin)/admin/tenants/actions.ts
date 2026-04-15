@@ -1,120 +1,208 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { auth, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { fetchAfmInfo, type AfmInfo, type AfmKad } from "@/lib/afm";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { revalidatePath } from "next/cache";
+import { sendUserInviteEmail } from "@/lib/email";
 
-export async function lookupAfmAction(afm: string): Promise<AfmInfo> {
+async function requireAdmin() {
   const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-  return fetchAfmInfo(afm);
+  if (!session || !isAdmin(session.user.role)) throw new Error("Forbidden");
+  return session;
 }
 
-interface SaveInput {
-  id?: string;
-  form: {
-    afm: string; code: string; name: string; sotitle: string;
-    isprosp: number; country: string; address: string; zip: string;
-    district: string; city: string; area: string; latitude: string; longitude: string;
-    phone01: string; phone02: string; jobtype: string; jobtypetrd: string;
-    trdpgroup: string; webpage: string; email: string; emailacc: string;
-    trdbusiness: string; irsdata: string; consent: boolean; prjcs: string;
-    remark: string; registrationDate: string; numberOfEmployees: string; gemiCode: string;
-  };
-  kads: AfmKad[];
+function generatePassword(len = 12): string {
+  const bytes = crypto.randomBytes(len);
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let s = "";
+  for (let i = 0; i < len; i++) s += alphabet[bytes[i] % alphabet.length];
+  return s;
 }
 
-const str = (s: string) => (s.trim() ? s.trim() : null);
-const num = (s: string) => (s.trim() ? Number(s) : null);
+export async function assignDeviceToTenantAction(input: {
+  tenantId: string;
+  devEui: string;
+  name?: string;
+  model?: string;
+  applicationId?: string;
+  locationId?: string | null;
+}): Promise<void> {
+  const session = await requireAdmin();
+  const devEui = input.devEui.toUpperCase();
 
-function slugify(s: string) {
-  return s.toLowerCase().trim()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80) || `tenant-${Date.now()}`;
-}
-
-export async function saveAfmTenantAction(input: SaveInput): Promise<{ id: string }> {
-  const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-
-  const f = input.form;
-  if (!f.afm || f.afm.length !== 9) throw new Error("Μη έγκυρο ΑΦΜ");
-
-  const data = {
-    afm: f.afm,
-    code: str(f.code),
-    name: str(f.name) ?? `ΑΦΜ ${f.afm}`,
-    sotitle: str(f.sotitle),
-    isprosp: f.isprosp,
-    country: num(f.country),
-    address: str(f.address),
-    zip: str(f.zip),
-    district: str(f.district),
-    city: str(f.city),
-    area: str(f.area),
-    latitude: num(f.latitude),
-    longitude: num(f.longitude),
-    phone01: str(f.phone01),
-    phone02: str(f.phone02),
-    jobtype: num(f.jobtype),
-    jobtypetrd: str(f.jobtypetrd),
-    trdpgroup: num(f.trdpgroup),
-    webpage: str(f.webpage),
-    email: str(f.email),
-    emailacc: str(f.emailacc),
-    trdbusiness: num(f.trdbusiness),
-    irsdata: str(f.irsdata),
-    consent: f.consent,
-    prjcs: num(f.prjcs),
-    remark: str(f.remark),
-    registrationDate: f.registrationDate ? new Date(f.registrationDate) : null,
-    numberOfEmployees: num(f.numberOfEmployees),
-    gemiCode: str(f.gemiCode),
-    billingEmail: str(f.email),
-  };
-
-  let tenant;
-  if (input.id) {
-    tenant = await db.tenant.update({ where: { id: input.id }, data });
-  } else {
-    const existing = await db.tenant.findFirst({ where: { afm: f.afm } });
-    if (existing) {
-      tenant = await db.tenant.update({ where: { id: existing.id }, data });
-    } else {
-      // Generate a unique slug
-      const baseSlug = slugify(data.name);
-      let slug = baseSlug;
-      let n = 1;
-      while (await db.tenant.findUnique({ where: { slug } })) {
-        slug = `${baseSlug}-${++n}`;
-      }
-      tenant = await db.tenant.create({ data: { ...data, slug } });
-    }
+  // Default locationId to the tenant's main Location if not specified.
+  let locationId = input.locationId ?? null;
+  if (locationId === null) {
+    const main = await db.location.findFirst({
+      where: { tenantId: input.tenantId, isMain: true },
+      select: { id: true },
+    });
+    locationId = main?.id ?? null;
   }
 
-  for (const k of input.kads) {
-    await db.companyKad.upsert({
-      where: { tenantId_kadCode: { tenantId: tenant.id, kadCode: k.firm_act_code } },
-      update: { kadDescription: k.firm_act_descr, kadType: k.firm_act_kind },
-      create: {
-        tenantId: tenant.id,
-        kadCode: k.firm_act_code,
-        kadDescription: k.firm_act_descr,
-        kadType: k.firm_act_kind,
+  const existing = await db.device.findFirst({ where: { devEui } });
+  if (existing) {
+    if (existing.tenantId === input.tenantId) return;
+    await db.device.update({
+      where: { id: existing.id },
+      data: { tenantId: input.tenantId, locationId },
+    });
+  } else {
+    await db.device.create({
+      data: {
+        devEui,
+        tenantId: input.tenantId,
+        name: input.name ?? devEui,
+        model: input.model ?? null,
+        applicationId: input.applicationId ?? null,
+        locationId,
       },
     });
   }
 
+  const userExists = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } });
+  await db.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      userId: userExists ? session.user.id : null,
+      action: "ASSIGN_DEVICE",
+      entity: "Device",
+      entityId: devEui,
+      meta: { devEui },
+    },
+  });
   revalidatePath("/admin/tenants");
-  return { id: tenant.id };
+  revalidatePath("/admin/devices");
 }
 
-export async function deleteTenantAction(id: string): Promise<void> {
-  const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-  await db.tenant.delete({ where: { id } });
+export interface CreateTenantUserInput {
+  tenantId: string;
+  email: string;
+  name: string;
+  role: "CUSTOMER" | "OPERATOR" | "VIEWER";
+  password?: string;
+  receiveAlerts?: boolean;
+}
+
+export interface CreateTenantUserResult {
+  id: string;
+  email: string;
+  tempPassword: string;
+}
+
+export async function createTenantUserAction(
+  input: CreateTenantUserInput
+): Promise<CreateTenantUserResult> {
+  const session = await requireAdmin();
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim();
+  if (!email || !name) throw new Error("Email and name are required");
+
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) throw new Error("Ο χρήστης υπάρχει ήδη");
+
+  const pwd = input.password?.trim() || generatePassword();
+  const passwordHash = await bcrypt.hash(pwd, 12);
+
+  const user = await db.user.create({
+    data: {
+      email, name, passwordHash,
+      role: input.role,
+      tenantId: input.tenantId,
+      locale: "el",
+      theme: "dark",
+      isActive: true,
+      receiveAlerts: !!input.receiveAlerts,
+    },
+  });
+
+  const userExists = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } });
+  await db.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      userId: userExists ? session.user.id : null,
+      action: "CREATE_USER",
+      entity: "User",
+      entityId: user.id,
+      meta: { email, role: input.role },
+    },
+  });
+
+  // Fire-and-forget invite email (don't block the UI if Mailgun hiccups)
+  const tenant = await db.tenant.findUnique({ where: { id: input.tenantId }, select: { name: true } });
+  sendUserInviteEmail({
+    to: email,
+    name,
+    tenantName: tenant?.name ?? "",
+    tempPassword: pwd,
+    locale: "el",
+  }).catch((err) => console.error("[invite-email] failed:", err));
+
+  revalidatePath("/admin/tenants");
+  return { id: user.id, email, tempPassword: pwd };
+}
+
+export async function setTenantActiveAction(id: string, isActive: boolean) {
+  await requireAdmin();
+  await db.tenant.update({ where: { id }, data: { isActive } });
+  revalidatePath("/admin/tenants");
+}
+
+// ─── Tenant user management ──────────────────────────────────────────────────
+
+export async function updateTenantUserAction(input: {
+  userId: string;
+  name?: string;
+  role?: "CUSTOMER" | "OPERATOR" | "VIEWER";
+  isActive?: boolean;
+  receiveAlerts?: boolean;
+}): Promise<void> {
+  await requireAdmin();
+  const data: Record<string, unknown> = {};
+  if (input.name !== undefined) data.name = input.name.trim();
+  if (input.role !== undefined) data.role = input.role;
+  if (input.isActive !== undefined) data.isActive = input.isActive;
+  if (input.receiveAlerts !== undefined) data.receiveAlerts = input.receiveAlerts;
+  await db.user.update({ where: { id: input.userId }, data });
+  revalidatePath("/admin/tenants");
+}
+
+export async function resetTenantUserPasswordAction(
+  userId: string
+): Promise<{ tempPassword: string }> {
+  await requireAdmin();
+  const pwd = generatePassword();
+  const passwordHash = await bcrypt.hash(pwd, 12);
+  await db.user.update({ where: { id: userId }, data: { passwordHash } });
+  revalidatePath("/admin/tenants");
+  return { tempPassword: pwd };
+}
+
+export async function setDeviceLocationAction(input: {
+  deviceId: string;
+  locationId: string | null;
+}): Promise<void> {
+  await requireAdmin();
+  const dev = await db.device.findUnique({ where: { id: input.deviceId }, select: { id: true, tenantId: true } });
+  if (!dev) throw new Error("Device not found");
+  if (input.locationId) {
+    const loc = await db.location.findUnique({ where: { id: input.locationId }, select: { tenantId: true } });
+    if (!loc || loc.tenantId !== dev.tenantId) throw new Error("Location does not belong to this tenant");
+  }
+  await db.device.update({
+    where: { id: dev.id },
+    data: { locationId: input.locationId },
+  });
+  revalidatePath("/admin/tenants");
+  revalidatePath("/admin/devices");
+}
+
+export async function deleteTenantUserAction(userId: string): Promise<void> {
+  const session = await requireAdmin();
+  if (userId === session.user.id) throw new Error("Δεν μπορείτε να διαγράψετε τον εαυτό σας");
+  // AuditLog.userId is optional → delete is safe
+  await db.user.delete({ where: { id: userId } });
   revalidatePath("/admin/tenants");
 }

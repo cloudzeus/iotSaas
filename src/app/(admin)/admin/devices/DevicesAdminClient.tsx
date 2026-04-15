@@ -2,10 +2,38 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  Cpu, Wifi, WifiOff, Battery, Link as LinkIcon, X, Loader2,
-  Save, Unlink, Plus, Search, Check,
-} from "lucide-react";
+  FiCpu, FiBatteryCharging, FiLink, FiX, FiLoader,
+  FiSave, FiSlash, FiPlus, FiSearch, FiCheck,
+} from "react-icons/fi";
+
+const Cpu = FiCpu;
+const Battery = FiBatteryCharging;
+const LinkIcon = FiLink;
+const X = FiX;
+const Loader2 = FiLoader;
+const Save = FiSave;
+const Unlink = FiSlash;
+const Plus = FiPlus;
+const Search = FiSearch;
+const Check = FiCheck;
+
+function StatusDot({ online }: { online: boolean }) {
+  return (
+    <span
+      title={online ? "Online" : "Offline"}
+      style={{
+        display: "inline-block",
+        width: 10, height: 10, borderRadius: "50%",
+        background: online ? "var(--green)" : "var(--red)",
+        boxShadow: online
+          ? "0 0 0 3px rgba(34,197,94,0.18)"
+          : "0 0 0 3px rgba(239,68,68,0.18)",
+      }}
+    />
+  );
+}
 import { assignDeviceAction, unassignDeviceAction, type DeviceListResult } from "./actions";
 import m from "@/components/customers/customers.module.css";
 
@@ -89,10 +117,12 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
                     <td><span className="badge badge-gray">{d.model}</span></td>
                     <td style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>{d.application?.applicationName ?? "—"}</td>
                     <td>
-                      <span className={`badge ${d.connectStatus === "ONLINE" ? "badge-green" : "badge-gray"}`}>
-                        {d.connectStatus === "ONLINE" ? <Wifi size={11} style={{ display: "inline", marginRight: 4 }} /> : <WifiOff size={11} style={{ display: "inline", marginRight: 4 }} />}
-                        {d.connectStatus}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <StatusDot online={d.connectStatus === "ONLINE"} />
+                        <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                          {d.connectStatus === "ONLINE" ? "Online" : "Offline"}
+                        </span>
+                      </div>
                     </td>
                     <td style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>
                       {typeof d.electricity === "number"
@@ -137,14 +167,24 @@ export default function DevicesAdminClient({ data, tenants, locale }: Props) {
                   </td></tr>
                 ) : data.assigned.map((d) => (
                   <tr key={d.devEui}>
-                    <td style={{ fontWeight: 500 }}>{d.name}</td>
+                    <td style={{ fontWeight: 500 }}>
+                      <Link
+                        href={`/admin/devices/${d.id}`}
+                        style={{ color: "var(--text-primary)", textDecoration: "none" }}
+                      >
+                        {d.name}
+                      </Link>
+                    </td>
                     <td style={{ fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "0.85rem" }}>{d.devEui}</td>
                     <td><span className="badge badge-orange">{d.tenant.name}</span></td>
                     <td style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }}>{d.model || "—"}</td>
                     <td>
-                      <span className={`badge ${d.online ? "badge-green" : "badge-gray"}`}>
-                        {d.online ? "ONLINE" : "OFFLINE"}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <StatusDot online={d.online} />
+                        <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                          {d.online ? "Online" : "Offline"}
+                        </span>
+                      </div>
                     </td>
                     <td style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
                       {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString(locale === "el" ? "el-GR" : "en-GB") : "—"}

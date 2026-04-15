@@ -56,6 +56,7 @@ export interface DashboardSection {
   id: string;
   name: string;
   order: number;
+  cols?: number;          // widgets-per-row on desktop (1–6). Mobile auto-stacks.
   collapsed?: boolean;
 }
 

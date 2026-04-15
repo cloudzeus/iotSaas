@@ -2,7 +2,7 @@
 
 /**
  * Server Actions for dashboard & widget mutations.
- * All data writes go through these — no direct API calls from client components.
+ * Admins (SUPER_ADMIN / ADMIN) may act on any tenant's dashboard.
  */
 
 import { revalidatePath } from "next/cache";
@@ -10,79 +10,112 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { WidgetType, WidgetConfig } from "@/components/widgets/types";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+type Section = {
+  id: string;
+  name: string;
+  order: number;
+  cols?: number;          // per-section column count (overrides dashboard default)
+  collapsed?: boolean;
+};
 type Layout = {
   cols: number;
   rowHeight: number;
-  sections: Array<{ id: string; name: string; order: number; collapsed?: boolean }>;
+  sections: Section[];
 };
 
-async function requireDashboard(dashboardId: string, tenantId: string) {
-  const dash = await prisma.dashboard.findFirst({
-    where: { id: dashboardId, tenantId },
-  });
+// ─── Authorization helper ─────────────────────────────────────────────────────
+
+async function authorizedSession() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  return session;
+}
+
+function isAdmin(role: string) {
+  return role === "SUPER_ADMIN" || role === "ADMIN";
+}
+
+/**
+ * Loads a dashboard and verifies the caller may write to it.
+ * Admins can touch any dashboard; regular users only their own tenant's.
+ * Returns the dashboard and the tenantId to use for revalidation/paths.
+ */
+async function requireDashboardAccess(
+  dashboardId: string,
+  role: string,
+  tenantIdFromSession: string | null
+) {
+  const dash = await prisma.dashboard.findUnique({ where: { id: dashboardId } });
   if (!dash) throw new Error("Dashboard not found");
+  if (!isAdmin(role) && dash.tenantId !== tenantIdFromSession) {
+    throw new Error("Forbidden");
+  }
   return dash;
+}
+
+function rolePath(tenantId: string, role: string) {
+  // Admins editing from /admin/tenants/<id>/dashboard want that path refreshed;
+  // regular users want /dashboard. Returning both keeps both in sync.
+  return isAdmin(role) ? [`/admin/tenants/${tenantId}/dashboard`, "/dashboard"] : ["/dashboard"];
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-export async function createDashboard(name: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+export async function createDashboard(name: string, tenantIdOverride?: string) {
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
+
+  const tenantId = isAdmin(session.user.role)
+    ? (tenantIdOverride ?? session.user.tenantId)
+    : session.user.tenantId;
+  if (!tenantId) throw new Error("tenantId required");
 
   const dashboard = await prisma.dashboard.create({
     data: {
-      tenantId: session.user.tenantId,
+      tenantId,
       name,
       isDefault: false,
       layout: {
         cols: 12,
         rowHeight: 60,
-        sections: [
-          { id: crypto.randomUUID(), name: "Overview", order: 0 },
-        ],
+        sections: [{ id: crypto.randomUUID(), name: "Overview", order: 0, cols: 12 }],
       },
     },
     include: { widgets: true },
   });
-  revalidatePath("/dashboard");
+  rolePath(tenantId, session.user.role).forEach(revalidatePath);
   return dashboard;
 }
 
 export async function renameDashboard(id: string, name: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
-  await requireDashboard(id, session.user.tenantId);
+  const session = await authorizedSession();
+  const dash = await requireDashboardAccess(id, session.user.role, session.user.tenantId ?? null);
   await prisma.dashboard.update({ where: { id }, data: { name } });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 export async function deleteDashboard(id: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
-  const dash = await requireDashboard(id, session.user.tenantId);
-  if ((dash.layout as Layout)?.sections === undefined)
-    throw new Error("Cannot delete");
+  const session = await authorizedSession();
+  const dash = await requireDashboardAccess(id, session.user.role, session.user.tenantId ?? null);
   await prisma.dashboard.delete({ where: { id } });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
 export async function addSection(dashboardId: string, name: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
+  const dash = await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
-  const dash = await requireDashboard(dashboardId, session.user.tenantId);
   const layout = dash.layout as Layout;
-  const newSection = {
+  const newSection: Section = {
     id: crypto.randomUUID(),
     name,
     order: layout.sections.length,
+    cols: layout.cols,
     collapsed: false,
   };
 
@@ -90,40 +123,37 @@ export async function addSection(dashboardId: string, name: string) {
     where: { id: dashboardId },
     data: { layout: { ...layout, sections: [...layout.sections, newSection] } },
   });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
   return newSection;
 }
 
 export async function updateSection(
   dashboardId: string,
   sectionId: string,
-  updates: { name?: string; collapsed?: boolean }
+  updates: { name?: string; collapsed?: boolean; cols?: number }
 ) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
+  const dash = await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
-  const dash = await requireDashboard(dashboardId, session.user.tenantId);
   const layout = dash.layout as Layout;
   const sections = layout.sections.map((s) =>
-    s.id === sectionId ? { ...s, ...updates } : s
+    s.id === sectionId
+      ? { ...s, ...updates, ...(updates.cols != null ? { cols: Math.max(1, Math.min(24, Math.round(updates.cols))) } : {}) }
+      : s
   );
   await prisma.dashboard.update({
     where: { id: dashboardId },
     data: { layout: { ...layout, sections } },
   });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 export async function deleteSection(dashboardId: string, sectionId: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
+  const dash = await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
-  const dash = await requireDashboard(dashboardId, session.user.tenantId);
   const layout = dash.layout as Layout;
-
-  // Orphan widgets — move to first remaining section or keep sectionId unchanged
-  // (they'll just not render until section is created again)
   const sections = layout.sections
     .filter((s) => s.id !== sectionId)
     .map((s, i) => ({ ...s, order: i }));
@@ -132,14 +162,13 @@ export async function deleteSection(dashboardId: string, sectionId: string) {
     where: { id: dashboardId },
     data: { layout: { ...layout, sections } },
   });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 export async function reorderSections(dashboardId: string, orderedIds: string[]) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
+  const dash = await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
-  const dash = await requireDashboard(dashboardId, session.user.tenantId);
   const layout = dash.layout as Layout;
   const sectionMap = new Map(layout.sections.map((s) => [s.id, s]));
   const sections = orderedIds.map((id, i) => {
@@ -151,7 +180,7 @@ export async function reorderSections(dashboardId: string, orderedIds: string[])
     where: { id: dashboardId },
     data: { layout: { ...layout, sections } },
   });
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -165,11 +194,9 @@ export async function addWidget(
     position: { x: number; y: number; w: number; h: number; sectionId: string };
   }
 ) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
-
-  await requireDashboard(dashboardId, session.user.tenantId);
+  const dash = await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
   const widget = await prisma.widget.create({
     data: {
@@ -181,7 +208,7 @@ export async function addWidget(
     },
   });
 
-  revalidatePath("/dashboard");
+  rolePath(dash.tenantId, session.user.role).forEach(revalidatePath);
   return widget;
 }
 
@@ -190,14 +217,17 @@ export async function updateWidgetConfig(
   config: Partial<WidgetConfig>,
   title?: string
 ) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
 
-  const widget = await prisma.widget.findFirst({
-    where: { id: widgetId, dashboard: { tenantId: session.user.tenantId } },
+  const widget = await prisma.widget.findUnique({
+    where: { id: widgetId },
+    include: { dashboard: { select: { tenantId: true } } },
   });
   if (!widget) throw new Error("Not found");
+  if (!isAdmin(session.user.role) && widget.dashboard.tenantId !== session.user.tenantId) {
+    throw new Error("Forbidden");
+  }
 
   const current = widget.config as Record<string, unknown>;
   await prisma.widget.update({
@@ -207,18 +237,16 @@ export async function updateWidgetConfig(
       config: { ...current, ...config },
     },
   });
-  revalidatePath("/dashboard");
+  rolePath(widget.dashboard.tenantId, session.user.role).forEach(revalidatePath);
 }
 
 export async function saveWidgetLayout(
   dashboardId: string,
   layouts: Array<{ id: string; x: number; y: number; w: number; h: number; sectionId: string }>
 ) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") return;
-
-  await requireDashboard(dashboardId, session.user.tenantId);
+  await requireDashboardAccess(dashboardId, session.user.role, session.user.tenantId ?? null);
 
   await Promise.all(
     layouts.map(async ({ id, x, y, w, h, sectionId }) => {
@@ -237,19 +265,21 @@ export async function saveWidgetLayout(
       });
     })
   );
-  // No revalidate — layout saves are high-frequency; client is authoritative
 }
 
 export async function removeWidget(widgetId: string) {
-  const session = await auth();
-  if (!session?.user?.tenantId) throw new Error("Unauthorized");
+  const session = await authorizedSession();
   if (session.user.role === "VIEWER") throw new Error("Forbidden");
 
-  const widget = await prisma.widget.findFirst({
-    where: { id: widgetId, dashboard: { tenantId: session.user.tenantId } },
+  const widget = await prisma.widget.findUnique({
+    where: { id: widgetId },
+    include: { dashboard: { select: { tenantId: true } } },
   });
   if (!widget) throw new Error("Not found");
+  if (!isAdmin(session.user.role) && widget.dashboard.tenantId !== session.user.tenantId) {
+    throw new Error("Forbidden");
+  }
 
   await prisma.widget.delete({ where: { id: widgetId } });
-  revalidatePath("/dashboard");
+  rolePath(widget.dashboard.tenantId, session.user.role).forEach(revalidatePath);
 }

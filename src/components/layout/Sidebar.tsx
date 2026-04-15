@@ -4,10 +4,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  LayoutDashboard, Cpu, Bell, CreditCard, Settings,
-  HelpCircle, LogOut, ChevronLeft, ChevronRight,
-  Users, BookOpen, BarChart3, Shield, LayoutGrid,
-} from "lucide-react";
+  FiGrid, FiCpu, FiBell, FiCreditCard, FiSettings,
+  FiHelpCircle, FiLogOut, FiChevronLeft, FiChevronRight,
+  FiUsers, FiBookOpen, FiBarChart2, FiShield, FiLayers, FiArchive,
+} from "react-icons/fi";
+
+const LayoutDashboard = FiGrid;
+const Cpu = FiCpu;
+const Bell = FiBell;
+const CreditCard = FiCreditCard;
+const Settings = FiSettings;
+const HelpCircle = FiHelpCircle;
+const LogOut = FiLogOut;
+const ChevronLeft = FiChevronLeft;
+const ChevronRight = FiChevronRight;
+const Users = FiUsers;
+const BookOpen = FiBookOpen;
+const BarChart3 = FiBarChart2;
+const Shield = FiShield;
+const LayoutGrid = FiLayers;
+const History = FiArchive;
 
 interface SidebarProps {
   collapsed: boolean;
@@ -57,10 +73,12 @@ export default function Sidebar({ collapsed, onToggle, role, locale }: SidebarPr
 
   const adminLinks = [
     { href: "/admin/overview", icon: BarChart3, label: t ? "Επισκόπηση" : "Overview" },
-    { href: "/admin/tenants", icon: Users, label: t ? "Πελάτες" : "Tenants" },
+    { href: "/admin/customers", icon: Users, label: t ? "Πελάτες (CRM)" : "Customers" },
+    { href: "/admin/tenants", icon: Users, label: t ? "SaaS Tenants" : "Tenants" },
     { href: "/admin/devices", icon: Cpu, label: t ? "Συσκευές" : "Devices" },
     { href: "/admin/widgets", icon: LayoutGrid, label: t ? "Widgets" : "Widgets" },
     { href: "/admin/plans", icon: BookOpen, label: t ? "Πλάνα" : "Plans" },
+    { href: "/admin/sync", icon: History, label: t ? "Συγχρονισμοί" : "Sync Jobs" },
     { href: "/admin/audit", icon: Shield, label: t ? "Ιστορικό" : "Audit Log" },
     { href: "/admin/settings", icon: Settings, label: t ? "Ρυθμίσεις" : "Settings" },
   ];

@@ -7,10 +7,11 @@ import "react-resizable/css/styles.css";
 
 import type { DashboardSection, WidgetType, WidgetConfig, WIDGET_DEFAULTS } from "./types";
 import { WIDGET_DEFAULTS as WD } from "./types";
-import { saveWidgetLayout, removeWidget, addWidget } from "@/lib/dashboard-actions";
+import { saveWidgetLayout, removeWidget, addWidget, updateWidgetConfig } from "@/lib/dashboard-actions";
 import WidgetRenderer from "./WidgetRenderer";
 import SectionManager from "./SectionManager";
 import AddWidgetPanel from "./AddWidgetPanel";
+import WidgetConfigModal from "./WidgetConfigModal";
 
 interface WidgetRow {
   id: string;
@@ -60,6 +61,7 @@ export default function DashboardGrid({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showSectionManager, setShowSectionManager] = useState(false);
   const [addWidgetSectionId, setAddWidgetSectionId] = useState<string | null>(null);
+  const [editingWidget, setEditingWidget] = useState<WidgetRow | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -133,15 +135,17 @@ export default function DashboardGrid({
     config: WidgetConfig
   ) {
     const def = WD[type];
+    const section = sections.find((s) => s.id === sectionId);
+    const perRow = section?.cols ?? 3;
+    const defaultW = Math.max(2, Math.min(12, Math.floor(COLS / perRow)));
     const existingInSection = widgetsForSection(sectionId);
-    // Find a free Y slot
     const maxY = existingInSection.reduce((m, w) => Math.max(m, w.position.y + w.position.h), 0);
 
     const newWidget = await addWidget(dashboardId, {
       type,
       title,
       config: { ...config, sectionId },
-      position: { x: 0, y: maxY, w: def.w, h: def.h, sectionId },
+      position: { x: 0, y: maxY, w: defaultW, h: def.h, sectionId },
     });
 
     setWidgets((prev) => [...prev, newWidget as WidgetRow]);
@@ -306,6 +310,13 @@ export default function DashboardGrid({
                   isDraggable={editMode}
                   isResizable={editMode}
                   onLayoutChange={(layout) => handleLayoutChange(section.id, layout)}
+                  // Mobile: stack widgets full-width. Desktop: use their stored widths.
+                  layout={containerWidth < 640
+                    ? sectionWidgets.map((w, i) => ({
+                        i: w.id, x: 0, y: i * (w.position.h || 4),
+                        w: COLS, h: w.position.h || 4,
+                      }))
+                    : undefined}
                   draggableHandle=".widget-drag-handle"
                   margin={[8, 8]}
                   containerPadding={[8, 8]}
@@ -315,72 +326,22 @@ export default function DashboardGrid({
                     <div
                       key={widget.id}
                       style={{
-                        background: "var(--card)",
-                        border: "1px solid rgba(255,255,255,0.07)",
+                        background: "var(--bg-card)",
+                        border: "1px solid var(--border)",
                         borderRadius: 10,
                         overflow: "hidden",
-                        position: "relative",
+                        display: "flex",
+                        flexDirection: "column",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                       }}
                     >
-                      {/* Edit mode overlay: drag handle + remove */}
-                      {editMode && (
-                        <>
-                          <div
-                            className="widget-drag-handle"
-                            style={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: 24,
-                              background: "rgba(255,102,0,0.08)",
-                              borderBottom: "1px solid rgba(255,102,0,0.15)",
-                              cursor: "grab",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              zIndex: 10,
-                            }}
-                          >
-                            <span
-                              style={{ color: "rgba(255,102,0,0.5)", fontSize: 12, userSelect: "none" }}
-                            >
-                              ⠿ {widget.title}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveWidget(widget.id)}
-                            style={{
-                              position: "absolute",
-                              top: 4,
-                              right: 6,
-                              background: "rgba(239,68,68,0.15)",
-                              border: "none",
-                              color: "#ef4444",
-                              borderRadius: 4,
-                              width: 18,
-                              height: 18,
-                              fontSize: 11,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              zIndex: 11,
-                            }}
-                            title="Remove widget"
-                          >
-                            ×
-                          </button>
-                        </>
-                      )}
-
-                      {/* Actual widget content */}
-                      <div
-                        style={{
-                          height: "100%",
-                          paddingTop: editMode ? 24 : 0,
-                        }}
-                      >
+                      <WidgetHeader
+                        widget={widget}
+                        editMode={editMode}
+                        onEdit={() => setEditingWidget(widget)}
+                        onRemove={() => handleRemoveWidget(widget.id)}
+                      />
+                      <div style={{ flex: 1, minHeight: 0 }}>
                         <WidgetRenderer
                           id={widget.id}
                           type={widget.type}
@@ -410,6 +371,27 @@ export default function DashboardGrid({
         />
       )}
 
+      {editingWidget && (
+        <WidgetConfigModal
+          initialType={editingWidget.type}
+          initialTitle={editingWidget.title}
+          initialConfig={editingWidget.config}
+          devices={devices}
+          onSave={async (_type, title, config) => {
+            await updateWidgetConfig(editingWidget.id, config, title);
+            setWidgets((prev) =>
+              prev.map((w) =>
+                w.id === editingWidget.id
+                  ? { ...w, title, config: { ...w.config, ...config } }
+                  : w
+              )
+            );
+            setEditingWidget(null);
+          }}
+          onClose={() => setEditingWidget(null)}
+        />
+      )}
+
       {addWidgetSectionId && (
         <AddWidgetPanel
           sectionId={addWidgetSectionId}
@@ -422,4 +404,140 @@ export default function DashboardGrid({
       )}
     </div>
   );
+}
+
+// ─── Widget header with dropdown menu ─────────────────────────────────────────
+
+function WidgetHeader({
+  widget, editMode, onEdit, onRemove,
+}: {
+  widget: WidgetRow;
+  editMode: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onClick); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  return (
+    <div
+      className={editMode ? "widget-drag-handle" : undefined}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 12px",
+        borderBottom: "1px solid var(--border)",
+        background: editMode ? "rgba(255,102,0,0.04)" : "var(--bg-card)",
+        cursor: editMode ? "grab" : "default",
+        flexShrink: 0,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+        {editMode && (
+          <span style={{ color: "var(--text-muted)", fontSize: 12, userSelect: "none", flexShrink: 0 }}>⠿</span>
+        )}
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            minWidth: 0,
+          }}
+          title={widget.title}
+        >
+          {widget.title}
+        </span>
+      </div>
+      <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          aria-label="Widget menu"
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: "var(--text-muted)",
+            padding: 4,
+            borderRadius: 4,
+            display: "inline-flex",
+            alignItems: "center",
+            fontSize: 16,
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
+        >
+          ⋯
+        </button>
+        {open && (
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: "calc(100% + 4px)",
+              minWidth: 140,
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+              padding: 4,
+              zIndex: 50,
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(); }}
+              style={menuItemStyle()}
+            >
+              ✎ Edit properties
+            </button>
+            <div style={{ height: 1, background: "var(--border)", margin: "4px 2px" }} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onRemove(); }}
+              style={menuItemStyle("#ef4444")}
+            >
+              × Remove
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function menuItemStyle(color?: string): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    padding: "7px 10px",
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    borderRadius: 4,
+    fontSize: 12,
+    color: color ?? "var(--text-primary)",
+    textAlign: "left",
+  };
 }

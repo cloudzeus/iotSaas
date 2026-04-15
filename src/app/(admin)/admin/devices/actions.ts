@@ -14,6 +14,7 @@ async function requireAdmin() {
 export interface DeviceListResult {
   unassigned: MilesightDevice[];
   assigned: Array<{
+    id: string;
     devEui: string;
     name: string;
     model: string | null;
@@ -38,15 +39,19 @@ export async function listAllDevicesAction(): Promise<DeviceListResult> {
   const msByEui = new Map(ms.content.map((d) => [d.devEUI.toUpperCase(), d]));
 
   const unassigned = ms.content.filter((d) => !localByEui.has(d.devEUI.toUpperCase()));
-  const assigned = local.map((d) => ({
-    devEui: d.devEui,
-    name: d.name,
-    model: d.model,
-    online: d.online,
-    lastSeenAt: d.lastSeenAt,
-    tenant: d.tenant,
-    milesight: msByEui.get(d.devEui.toUpperCase()),
-  }));
+  const assigned = local.map((d) => {
+    const live = msByEui.get(d.devEui.toUpperCase());
+    return {
+      id: d.id,
+      devEui: d.devEui,
+      name: d.name,
+      model: d.model,
+      online: live ? live.connectStatus === "ONLINE" : d.online,
+      lastSeenAt: live?.lastUpdateTime ? new Date(live.lastUpdateTime) : d.lastSeenAt,
+      tenant: d.tenant,
+      milesight: live,
+    };
+  });
 
   return { unassigned, assigned };
 }
@@ -82,7 +87,7 @@ export async function assignDeviceAction(input: {
   await db.auditLog.create({
     data: {
       tenantId: input.tenantId,
-      userId: session.user.id,
+      userId: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
       action: "ASSIGN_DEVICE",
       entity: "Device",
       entityId: devEui,
@@ -101,7 +106,7 @@ export async function unassignDeviceAction(devEui: string): Promise<void> {
   await db.auditLog.create({
     data: {
       tenantId: dev.tenantId,
-      userId: session.user.id,
+      userId: (await db.user.findUnique({ where: { id: session.user.id }, select: { id: true } })) ? session.user.id : null,
       action: "UNASSIGN_DEVICE",
       entity: "Device",
       entityId: dev.id,

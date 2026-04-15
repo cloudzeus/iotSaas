@@ -1,369 +1,296 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef, useTransition } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
+import dynamicImport from "next/dynamic";
+import { useRouter } from "next/navigation";
+
+const LocationsMiniMap = dynamicImport(
+  () => import("@/components/locations/LocationsMiniMap"),
+  { ssr: false }
+);
 import {
-  Plus, Search, Users, X, ChevronRight, MoreHorizontal,
-  Eye, Pencil, Trash2, UserSearch,
-} from "lucide-react";
-import { formatDate } from "@/lib/utils";
-import AfmLookup from "@/components/customers/AfmLookup";
-import { deleteTenantAction } from "@/app/(admin)/admin/tenants/actions";
-import s from "@/components/customers/customers.module.css";
+  FiBriefcase, FiChevronRight, FiMoreHorizontal, FiEye, FiPlus, FiUserPlus,
+  FiGrid, FiX, FiSave, FiLoader, FiAlertCircle, FiCheckCircle,
+  FiCopy, FiSearch, FiCheck, FiCpu, FiUser, FiMapPin, FiEdit2, FiTrash2, FiKey,
+} from "react-icons/fi";
 
-interface Kad {
-  id: number;
-  kadCode: string;
-  kadDescription: string;
-  kadType: string;
+const Building2 = FiBriefcase;
+const ChevronRight = FiChevronRight;
+const MoreHorizontal = FiMoreHorizontal;
+const Eye = FiEye;
+const Plus = FiPlus;
+const UserPlus = FiUserPlus;
+const LayoutDashboard = FiGrid;
+const X = FiX;
+const Save = FiSave;
+const Loader2 = FiLoader;
+const AlertCircle = FiAlertCircle;
+const CheckCircle2 = FiCheckCircle;
+const Copy = FiCopy;
+const Search = FiSearch;
+const Check = FiCheck;
+const Cpu = FiCpu;
+const UserRound = FiUser;
+const MapPin = FiMapPin;
+const Pencil = FiEdit2;
+const Trash2 = FiTrash2;
+const KeyRound = FiKey;
+import m from "@/components/customers/customers.module.css";
+import s from "@/components/customers/DataTable.module.css";
+import {
+  assignDeviceToTenantAction, createTenantUserAction, type CreateTenantUserResult,
+  updateTenantUserAction, resetTenantUserPasswordAction, deleteTenantUserAction,
+  setDeviceLocationAction,
+} from "./actions";
+
+interface DeviceLite {
+  id: string; devEui: string; name: string; model: string | null;
+  online: boolean; lastSeenAt: string | null; battery: number | null;
+  locationId?: string | null;
 }
-
-interface CustomerDevice {
+interface UserLite {
+  id: string; email: string; name: string; role: string;
+  isActive: boolean; lastLoginAt: string | null;
+}
+interface LocationLite {
   id: string;
-  devEui: string;
   name: string;
-  model: string | null;
-  online: boolean;
-  lastSeenAt: string | null;
-  battery: number | null;
+  isMain: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  city?: string | null;
 }
-
-interface Customer {
-  id: string;
-  afm: string | null;
-  code: string | null;
-  name: string | null;
-  sotitle: string | null;
-  isprosp: number;
-  country: number | null;
-  address: string | null;
-  zip: string | null;
-  district: string | null;
-  city: string | null;
-  area: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  phone01: string | null;
-  phone02: string | null;
-  jobtype: number | null;
-  jobtypetrd: string | null;
-  trdpgroup: number | null;
-  webpage: string | null;
-  email: string | null;
-  emailacc: string | null;
-  trdbusiness: number | null;
-  irsdata: string | null;
-  consent: boolean;
-  prjcs: number | null;
-  remark: string | null;
-  registrationDate: string | null;
-  numberOfEmployees: number | null;
-  gemiCode: string | null;
-  insdate?: string | null;
-  upddate?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  kads: Kad[];
-  devices?: CustomerDevice[];
-  _count: { kads: number; contacts: number; branches: number; devices?: number; users?: number };
+interface Tenant {
+  id: string; name: string; slug: string; isActive: boolean;
+  createdAt: string; billingEmail: string | null;
+  customer: { id: number; name: string; afm: string | null; city: string | null; email: string | null };
+  plan: { name: string; pricePerDevice: number } | null;
+  devices: DeviceLite[];
+  users: UserLite[];
+  locations: LocationLite[];
+  _count: { devices: number; users: number; dashboards: number; invoices: number; locations: number };
 }
+interface UnassignedDevice {
+  devEUI: string; name: string; model: string;
+  applicationId: string | null; connectStatus: string;
+}
+interface PlanLite { id: string; name: string; }
 
 interface Props {
-  customers?: Customer[];
+  tenants: Tenant[];
+  plans: PlanLite[];
+  unassignedDevices: UnassignedDevice[];
   locale: string;
 }
 
-export default function TenantsClient({ customers = [], locale }: Props) {
+export default function TenantsClient({ tenants, plans: _plans, unassignedDevices, locale }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const showNew = searchParams.get("new") === "1";
-  const editId = searchParams.get("edit");
-  const close = () => router.replace(pathname);
-  const openNew = () => router.replace(`${pathname}?new=1`);
-  const openEdit = (id: string) => router.replace(`${pathname}?edit=${id}`);
-
-  const [search, setSearch] = useState("");
+  const t = locale === "el";
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const t = locale === "el";
+  const [addingDeviceTo, setAddingDeviceTo] = useState<Tenant | null>(null);
+  const [addingUserTo, setAddingUserTo] = useState<Tenant | null>(null);
+  const [editingUser, setEditingUser] = useState<{ tenantName: string; user: UserLite } | null>(null);
 
-  const q = search.toLowerCase();
-  const filtered = customers.filter((c) =>
-    [c.name, c.sotitle, c.afm, c.email, c.city]
-      .filter(Boolean)
-      .some((v) => v!.toLowerCase().includes(q))
-  );
-
-  function toggleExpand(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  function toggle(id: string) {
+    setExpanded((p) => {
+      const n = new Set(p);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
     });
   }
-
-  function onDelete(c: Customer) {
-    if (!confirm(`${t ? "Διαγραφή πελάτη" : "Delete customer"} "${c.name || c.afm}";`)) return;
-    startTransition(async () => {
-      await deleteTenantAction(c.id);
-      setMenuFor(null);
-      router.refresh();
-    });
-  }
-
-  const editing = editId ? customers.find((c) => c.id === editId) : null;
-  const modalOpen = showNew || !!editing;
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">
-          <Users size={22} style={{ display: "inline", marginRight: 8, color: "var(--orange)" }} />
-          {t ? "Πελάτες" : "Customers"}
+          <Building2 size={22} style={{ display: "inline", marginRight: 8, color: "var(--orange)" }} />
+          {t ? "SaaS Tenants" : "SaaS Tenants"}
           <span style={{ marginLeft: 10, color: "var(--text-muted)", fontSize: "1rem", fontWeight: 400 }}>
-            ({customers.length})
+            ({tenants.length})
           </span>
         </h1>
-        <button className="btn-primary" onClick={openNew}>
-          <Plus size={16} />
-          {t ? "Νέος Πελάτης" : "New Customer"}
-        </button>
       </div>
 
-      <div className={s.searchWrap}>
-        <Search size={16} className={s.searchIcon} />
-        <input
-          className={`input ${s.searchInput}`}
-          placeholder={t ? "Αναζήτηση επωνυμίας, ΑΦΜ, email..." : "Search name, VAT, email..."}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="card">
-        <div className="table-wrap">
-          <table>
+      <div className={s.wrap}>
+        <div className={s.scroll}>
+          <table className={s.table}>
+            <colgroup>
+              <col style={{ width: 32 }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 40 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ width: 32 }}></th>
-                <th>{t ? "Επωνυμία" : "Name"}</th>
-                <th>ΑΦΜ</th>
-                <th>{t ? "ΔΟΥ" : "Tax Office"}</th>
-                <th>{t ? "Πόλη" : "City"}</th>
-                <th>{t ? "Επικοινωνία" : "Contact"}</th>
-                <th>ΚΑΔ</th>
-                <th>{t ? "Κατάσταση" : "Status"}</th>
-                <th>{t ? "Ενημέρωση" : "Updated"}</th>
-                <th style={{ width: 40 }}></th>
+                <th className={s.th}></th>
+                <th className={s.th}>{t ? "Tenant" : "Tenant"}</th>
+                <th className={s.th}>{t ? "CRM Πελάτης" : "CRM Customer"}</th>
+                <th className={s.th}>{t ? "Πλάνο" : "Plan"}</th>
+                <th className={s.th}>Email</th>
+                <th className={s.th}>{t ? "Συσκ." : "Dev."}</th>
+                <th className={s.th}>{t ? "Χρήστες" : "Users"}</th>
+                <th className={s.th}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className={s.emptyCell}>
-                    <UserSearch size={36} className={s.emptyIcon} />
-                    <div className={s.emptyTitle}>
-                      {t ? "Δεν βρέθηκαν πελάτες" : "No customers found"}
-                    </div>
-                    <div style={{ fontSize: "0.875rem" }}>
-                      {search
-                        ? (t ? "Δοκιμάστε διαφορετικούς όρους αναζήτησης" : "Try different search terms")
-                        : (t ? "Πατήστε «Νέος Πελάτης» για να ξεκινήσετε" : "Click \"New Customer\" to start")}
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((c) => {
-                  const isOpen = expanded.has(c.id);
-                  return (
-                    <Fragment key={c.id}>
-                      <tr
-                        className={`${s.row} ${isOpen ? s.rowExpanded : ""}`}
-                        onClick={() => toggleExpand(c.id)}
-                      >
-                        <td onClick={(e) => e.stopPropagation()} style={{ paddingLeft: 12 }}>
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(c.id)}
-                            className={s.expandBtn}
-                            aria-label={isOpen ? "Collapse" : "Expand"}
-                          >
-                            <ChevronRight
-                              size={16}
-                              className={`${s.chevron} ${isOpen ? s.chevronOpen : ""}`}
-                            />
-                          </button>
-                        </td>
-                        <td>
-                          <div className={s.nameCell}>
-                            <span className={s.avatar}>{initials(c.name || c.afm)}</span>
-                            <div className={s.nameInner}>
-                              <span className={s.nameMain}>{c.name || "—"}</span>
-                              {c.sotitle && <span className={s.nameSub}>{c.sotitle}</span>}
-                            </div>
+              {tenants.length === 0 ? (
+                <tr><td colSpan={8} className={m.emptyCell}>
+                  <div style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
+                    {t ? "Δεν υπάρχουν ενεργά tenants" : "No active tenants"}
+                  </div>
+                  <div style={{ fontSize: "0.85rem", marginTop: 6 }}>
+                    {t
+                      ? "Προωθήστε έναν πελάτη από το CRM σε tenant."
+                      : "Promote a customer from the CRM page."}
+                  </div>
+                </td></tr>
+              ) : tenants.map((tn) => {
+                const isOpen = expanded.has(tn.id);
+                return (
+                  <Fragment key={tn.id}>
+                    <tr className={s.tr}>
+                      <td className={s.td} style={{ padding: "8px 8px 8px 12px" }}>
+                        <button
+                          type="button"
+                          onClick={() => toggle(tn.id)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "inline-flex" }}
+                        >
+                          <ChevronRight size={14} style={{ transition: "transform 0.15s", transform: isOpen ? "rotate(90deg)" : "rotate(0)" }} />
+                        </button>
+                      </td>
+                      <td className={s.td}>
+                        <div style={{ fontWeight: 600 }}>{tn.name}</div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "monospace" }}>{tn.slug}</div>
+                      </td>
+                      <td className={s.td}>
+                        <Link
+                          href={`/admin/customers/${tn.customer.id}`}
+                          style={{ color: "var(--orange)", textDecoration: "none", fontSize: "0.85rem" }}
+                        >
+                          {tn.customer.name}
+                        </Link>
+                        {tn.customer.afm && (
+                          <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "monospace" }}>
+                            ΑΦΜ {tn.customer.afm}
                           </div>
-                        </td>
-                        <td className={s.afmCell}>{c.afm || "—"}</td>
-                        <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>{c.irsdata || "—"}</td>
-                        <td style={{ color: "var(--text-secondary)" }}>{c.city || "—"}</td>
-                        <td className={s.contactCell}>
-                          {c.phone01 && <div>{c.phone01}</div>}
-                          {c.email && <div>{c.email}</div>}
-                          {!c.phone01 && !c.email && "—"}
-                        </td>
-                        <td>
-                          <span className="badge badge-orange">{c._count.kads}</span>
-                        </td>
-                        <td>
-                          <span className={`badge ${c.isprosp === 1 ? "badge-yellow" : "badge-green"}`}>
-                            {c.isprosp === 1 ? (t ? "Prospect" : "Prospect") : (t ? "Πελάτης" : "Customer")}
-                          </span>
-                        </td>
-                        <td className={s.metaCell}>
-                          {c.updatedAt ? formatDate(c.updatedAt, locale === "el" ? "el-GR" : "en-GB") : "—"}
-                        </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <RowMenu
-                            isOpen={menuFor === c.id}
-                            onToggle={() => setMenuFor(menuFor === c.id ? null : c.id)}
-                            onView={() => { toggleExpand(c.id); setMenuFor(null); }}
-                            onEdit={() => { openEdit(c.id); setMenuFor(null); }}
-                            onDelete={() => onDelete(c)}
-                            disabled={pending}
+                        )}
+                      </td>
+                      <td className={s.td}>
+                        {tn.plan ? <span className="badge badge-orange">{tn.plan.name}</span> : <span className="badge badge-gray">—</span>}
+                      </td>
+                      <td className={s.td} style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                        {tn.billingEmail || "—"}
+                      </td>
+                      <td className={s.td}>{tn._count.devices}</td>
+                      <td className={s.td}>{tn._count.users}</td>
+                      <td className={s.td} style={{ position: "relative" }}>
+                        <RowMenu
+                          open={menuFor === tn.id}
+                          onToggle={() => setMenuFor(menuFor === tn.id ? null : tn.id)}
+                          onView={() => { toggle(tn.id); setMenuFor(null); }}
+                          onAddDevice={() => { setAddingDeviceTo(tn); setMenuFor(null); }}
+                          onAddUser={() => { setAddingUserTo(tn); setMenuFor(null); }}
+                          onDashboard={() => router.push(`/admin/tenants/${tn.id}/dashboard`)}
+                          onLocations={() => router.push(`/admin/tenants/${tn.id}/locations`)}
+                          t={t}
+                        />
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={8} style={{ background: "var(--bg-elevated)", padding: 0 }}>
+                          <TenantDetail
+                            tn={tn}
                             t={t}
+                            onEditUser={(u) => setEditingUser({ tenantName: tn.name, user: u })}
                           />
                         </td>
                       </tr>
-                      {isOpen && (
-                        <tr>
-                          <td colSpan={10} className={s.detailCell}>
-                            <CustomerDetail c={c} t={t} />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })
-              )}
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {modalOpen && (
-        <div className={s.backdrop} onClick={close}>
-          <div className={s.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={s.modalHeader}>
-              <div className={s.modalTitle}>
-                {editing ? <Pencil size={16} /> : <Plus size={16} />}
-                {editing
-                  ? `${t ? "Επεξεργασία" : "Edit"}: ${editing.name || editing.afm}`
-                  : t ? "Νέος Πελάτης" : "New Customer"}
-              </div>
-              <button onClick={close} aria-label="Close" className={s.modalClose}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className={s.modalBody}>
-              <AfmLookup
-                tenantId={editing?.id}
-                initialForm={editing ? customerToForm(editing) : undefined}
-                initialKads={editing?.kads.map((k) => ({
-                  firm_act_code: k.kadCode,
-                  firm_act_descr: k.kadDescription,
-                  firm_act_kind: k.kadType,
-                  firm_act_kind_descr: k.kadType === "1" ? "ΚΥΡΙΑ" : "ΔΕΥΤΕΡΕΥΟΥΣΑ",
-                }))}
-              />
-            </div>
-          </div>
-        </div>
+      {addingDeviceTo && (
+        <AddDeviceModal
+          tenant={addingDeviceTo}
+          devices={unassignedDevices}
+          onClose={() => setAddingDeviceTo(null)}
+          t={t}
+        />
+      )}
+      {addingUserTo && (
+        <AddUserModal
+          tenant={addingUserTo}
+          onClose={() => setAddingUserTo(null)}
+          t={t}
+        />
+      )}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser.user}
+          tenantName={editingUser.tenantName}
+          onClose={() => setEditingUser(null)}
+          t={t}
+        />
       )}
     </div>
   );
 }
 
-function initials(name: string | null): string {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function customerToForm(c: Customer) {
-  // c may have updatedAt instead of upddate (Tenant uses standard names)
-  void c.upddate;
-  const v = (x: string | number | null) => (x == null ? "" : String(x));
-  return {
-    afm: v(c.afm), code: v(c.code), name: v(c.name), sotitle: v(c.sotitle),
-    isprosp: c.isprosp, country: v(c.country), address: v(c.address),
-    zip: v(c.zip), district: v(c.district), city: v(c.city), area: v(c.area),
-    latitude: v(c.latitude), longitude: v(c.longitude),
-    phone01: v(c.phone01), phone02: v(c.phone02),
-    jobtype: v(c.jobtype), jobtypetrd: v(c.jobtypetrd),
-    trdpgroup: v(c.trdpgroup), webpage: v(c.webpage),
-    email: v(c.email), emailacc: v(c.emailacc),
-    trdbusiness: v(c.trdbusiness), irsdata: v(c.irsdata),
-    consent: c.consent, prjcs: v(c.prjcs), remark: v(c.remark),
-    registrationDate: typeof c.registrationDate === "string" ? c.registrationDate : "",
-    numberOfEmployees: v(c.numberOfEmployees), gemiCode: v(c.gemiCode),
-  };
-}
-
 function RowMenu({
-  isOpen, onToggle, onView, onEdit, onDelete, disabled, t,
+  open, onToggle, onView, onAddDevice, onAddUser, onDashboard, onLocations, t,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onToggle: () => void;
   onView: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  disabled: boolean;
+  onAddDevice: () => void;
+  onAddUser: () => void;
+  onDashboard: () => void;
+  onLocations: () => void;
   t: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!isOpen) return;
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onToggle();
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onToggle();
-    }
+    if (!open) return;
+    function onClick(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) onToggle(); }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onToggle(); }
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [isOpen, onToggle]);
-
+    return () => { document.removeEventListener("mousedown", onClick); document.removeEventListener("keydown", onKey); };
+  }, [open, onToggle]);
   return (
-    <div ref={ref} className={s.menuWrap}>
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        aria-label="Actions"
-        className={s.menuTrigger}
-      >
-        <MoreHorizontal size={16} />
+    <div ref={ref} className={m.menuWrap}>
+      <button type="button" onClick={onToggle} className={m.menuTrigger}>
+        <MoreHorizontal size={14} />
       </button>
-      {isOpen && (
-        <div className={s.menu}>
-          <button type="button" className={s.menuItem} onClick={onView}>
+      {open && (
+        <div className={m.menu}>
+          <button type="button" className={m.menuItem} onClick={onView}>
             <Eye size={14} /> {t ? "Προβολή" : "View"}
           </button>
-          <button type="button" className={s.menuItem} onClick={onEdit}>
-            <Pencil size={14} /> {t ? "Επεξεργασία" : "Edit"}
+          <button type="button" className={m.menuItem} onClick={onDashboard}>
+            <LayoutDashboard size={14} /> {t ? "Dashboard" : "Dashboard"}
           </button>
-          <div className={s.menuSeparator} />
-          <button type="button" className={`${s.menuItem} ${s.menuItemDanger}`} onClick={onDelete}>
-            <Trash2 size={14} /> {t ? "Διαγραφή" : "Delete"}
+          <button type="button" className={m.menuItem} onClick={onLocations}>
+            <MapPin size={14} /> {t ? "Τοποθεσίες" : "Locations"}
+          </button>
+          <div className={m.menuSeparator} />
+          <button type="button" className={m.menuItem} onClick={onAddDevice}>
+            <Plus size={14} /> {t ? "Προσθήκη Συσκευής" : "Add Device"}
+          </button>
+          <button type="button" className={m.menuItem} onClick={onAddUser}>
+            <UserPlus size={14} /> {t ? "Νέος Χρήστης" : "Add User"}
           </button>
         </div>
       )}
@@ -371,189 +298,657 @@ function RowMenu({
   );
 }
 
-function CustomerDetail({ c, t }: { c: Customer; t: boolean }) {
-  const [tab, setTab] = useState<"info" | "kads" | "devices">("info");
-  const devCount = c.devices?.length ?? 0;
-  const kadCount = c.kads.length;
-
+function TenantDetail({
+  tn, t, onEditUser,
+}: {
+  tn: Tenant;
+  t: boolean;
+  onEditUser: (u: UserLite) => void;
+}) {
+  const pins = tn.locations
+    .filter((l) => l.latitude != null && l.longitude != null)
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      lat: l.latitude as number,
+      lng: l.longitude as number,
+      isMain: l.isMain,
+    }));
   return (
-    <div>
-      <div style={{ display: "flex", gap: 4, padding: "12px 24px 0", borderBottom: "1px solid var(--border)" }}>
-        <DetailTab active={tab === "info"} onClick={() => setTab("info")}>
-          {t ? "Στοιχεία" : "Info"}
-        </DetailTab>
-        <DetailTab active={tab === "kads"} onClick={() => setTab("kads")} count={kadCount}>
-          ΚΑΔ
-        </DetailTab>
-        <DetailTab active={tab === "devices"} onClick={() => setTab("devices")} count={devCount}>
-          {t ? "Συσκευές" : "Devices"}
-        </DetailTab>
+    <div
+      style={{
+        padding: 20,
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+        gap: 16,
+      }}
+      className="tenant-detail-grid"
+    >
+      <style jsx>{`
+        @media (max-width: 900px) {
+          .tenant-detail-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+      `}</style>
+
+      {/* LEFT: Devices — full column */}
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 14, minWidth: 0 }}>
+        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <Cpu size={12} /> {t ? "Συσκευές" : "Devices"} ({tn.devices.length})
+        </div>
+        {tn.devices.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>—</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {tn.devices.map((d) => (
+              <DeviceRow key={d.id} d={d} locations={tn.locations} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {tab === "info" && (
-        <div className={s.detailWrap}>
-          <DetailGroup title={t ? "Ταυτότητα" : "Identity"}>
-            <DetailRow label={t ? "Κωδικός" : "Code"} value={c.code} />
-            <DetailRow label={t ? "Διακριτικός" : "Title"} value={c.sotitle} />
-            <DetailRow label="ΓΕΜΗ" value={c.gemiCode} />
-            <DetailRow label={t ? "Έναρξη" : "Registered"} value={c.registrationDate ? formatDate(c.registrationDate, "el-GR") : null} />
-            <DetailRow label={t ? "Εργαζόμενοι" : "Employees"} value={c.numberOfEmployees} />
-            <DetailRow label="GDPR" value={c.consent ? "✓" : "✗"} />
-          </DetailGroup>
+      {/* RIGHT COLUMN: Users (top) + Locations map (bottom) stacked */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 14, minWidth: 0 }}>
+          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <UserRound size={12} /> {t ? "Χρήστες" : "Users"} ({tn.users.length})
+          </div>
+          {tn.users.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>—</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {tn.users.map((u) => (
+                <div
+                  key={u.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    background: "var(--bg-elevated)",
+                    borderRadius: 6,
+                    fontSize: "0.82rem",
+                    minWidth: 0,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: "0 1 auto", minWidth: 0, maxWidth: 140 }}>
+                    {u.name}
+                  </span>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
+                    {u.email}
+                  </span>
+                  <span className="badge badge-blue" style={{ flexShrink: 0 }}>{u.role}</span>
+                  {!u.isActive && <span className="badge badge-gray" style={{ flexShrink: 0 }}>inactive</span>}
+                  <button
+                    type="button"
+                    onClick={() => onEditUser(u)}
+                    aria-label="Edit user"
+                    title={t ? "Διαχείριση" : "Manage"}
+                    style={{
+                      flexShrink: 0,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-muted)",
+                      padding: 4,
+                      borderRadius: 4,
+                      display: "inline-flex",
+                    }}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-          <DetailGroup title={t ? "Διεύθυνση" : "Address"}>
-            <DetailRow label={t ? "Οδός" : "Street"} value={c.address} />
-            <DetailRow label="ΤΚ" value={c.zip} />
-            <DetailRow label={t ? "Πόλη" : "City"} value={c.city} />
-            <DetailRow label={t ? "Νομός" : "District"} value={c.district} />
-            <DetailRow label={t ? "Περιοχή" : "Area"} value={c.area} />
-            <DetailRow label={t ? "Χώρα" : "Country"} value={c.country} />
-          </DetailGroup>
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 14, minWidth: 0 }}>
+        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <MapPin size={12} /> {t ? "Τοποθεσίες" : "Locations"} ({tn.locations.length})
+          </span>
+          <Link href={`/admin/tenants/${tn.id}/locations`} style={{ color: "var(--orange)", textDecoration: "none", fontSize: "0.7rem", fontWeight: 600 }}>
+            {t ? "Διαχείριση →" : "Manage →"}
+          </Link>
+        </div>
+        {pins.length === 0 ? (
+          <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", padding: 20, textAlign: "center" }}>
+            {t ? "Χωρίς συντεταγμένες" : "No coordinates yet"}
+          </div>
+        ) : (
+          <>
+            <LocationsMiniMap pins={pins} height={180} />
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+              {tn.locations.map((l) => (
+                <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                  <span style={{
+                    display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                    background: l.isMain ? "var(--orange)" : "var(--blue)", flexShrink: 0,
+                  }} />
+                  <span style={{ fontWeight: l.isMain ? 600 : 400 }}>{l.name}</span>
+                  {l.city && <span style={{ color: "var(--text-muted)" }}>· {l.city}</span>}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      </div>{/* /right column */}
 
-          <DetailGroup title={t ? "Επικοινωνία" : "Contact"}>
-            <DetailRow label={t ? "Τηλ. 1" : "Phone 1"} value={c.phone01} />
-            <DetailRow label={t ? "Τηλ. 2" : "Phone 2"} value={c.phone02} />
-            <DetailRow label="Email" value={c.email} />
-            <DetailRow label={t ? "Email Λογ." : "Email Acc."} value={c.emailacc} />
-            <DetailRow label="Web" value={c.webpage} />
-          </DetailGroup>
+      <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+        <Stat label={t ? "Συσκευές" : "Devices"} value={tn._count.devices} />
+        <Stat label={t ? "Χρήστες" : "Users"} value={tn._count.users} />
+        <Stat label={t ? "Dashboards" : "Dashboards"} value={tn._count.dashboards} />
+        <Stat label={t ? "Τιμολόγια" : "Invoices"} value={tn._count.invoices} />
+      </div>
+    </div>
+  );
+}
 
-          <DetailGroup title="Softone">
-            <DetailRow label={t ? "Επάγγελμα" : "Job"} value={c.jobtypetrd || c.jobtype} />
-            <DetailRow label="Trdpgroup" value={c.trdpgroup} />
-            <DetailRow label="Trdbusiness" value={c.trdbusiness} />
-            <DetailRow label={t ? "Έργα" : "Projects"} value={c.prjcs} />
-          </DetailGroup>
+function DeviceRow({ d, locations }: { d: DeviceLite; locations: LocationLite[] }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [locationId, setLocationId] = useState<string>(d.locationId ?? "");
 
-          {c.remark && (
-            <div className={s.detailFull}>
-              <div className={s.detailGroupTitle}>{t ? "Σημειώσεις" : "Notes"}</div>
-              <div style={{ color: "var(--text-secondary)", fontSize: "0.85rem", whiteSpace: "pre-wrap" }}>
-                {c.remark}
+  function change(newId: string) {
+    setLocationId(newId);
+    start(async () => {
+      await setDeviceLocationAction({ deviceId: d.id, locationId: newId || null });
+      router.refresh();
+    });
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 10px",
+        background: "var(--bg-elevated)",
+        borderRadius: 6,
+        fontSize: "0.82rem",
+        minWidth: 0,
+        opacity: pending ? 0.6 : 1,
+      }}
+    >
+      <span
+        title={d.online ? "Online" : "Offline"}
+        style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: d.online ? "var(--green)" : "var(--red)",
+          boxShadow: d.online ? "0 0 0 2px rgba(34,197,94,0.2)" : "0 0 0 2px rgba(239,68,68,0.2)",
+          flexShrink: 0,
+        }}
+      />
+      <span style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: "0 1 auto", minWidth: 0, maxWidth: 120 }}>
+        {d.name}
+      </span>
+      <code style={{ fontFamily: "monospace", fontSize: "0.7rem", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
+        {d.devEui}
+      </code>
+      {d.model && (
+        <span className="badge badge-gray" style={{ flexShrink: 0 }}>
+          {d.model}
+        </span>
+      )}
+      {typeof d.battery === "number" && (
+        <span style={{ color: "var(--text-secondary)", fontSize: "0.72rem", flexShrink: 0, whiteSpace: "nowrap" }}>
+          🔋 {d.battery}%
+        </span>
+      )}
+      <select
+        value={locationId}
+        onChange={(e) => change(e.target.value)}
+        disabled={pending || locations.length === 0}
+        title="Location"
+        style={{
+          flexShrink: 0,
+          fontSize: "0.7rem",
+          padding: "3px 6px",
+          borderRadius: 4,
+          border: "1px solid var(--border)",
+          background: "var(--bg-card)",
+          color: "var(--text-secondary)",
+          maxWidth: 110,
+        }}
+      >
+        <option value="">— location —</option>
+        {locations.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.isMain ? "★ " : ""}{l.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 14px" }}>
+      <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)" }}>{value}</div>
+    </div>
+  );
+}
+
+function AddDeviceModal({
+  tenant, devices, onClose, t,
+}: {
+  tenant: Tenant;
+  devices: UnassignedDevice[];
+  onClose: () => void;
+  t: boolean;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [pickedEui, setPickedEui] = useState("");
+  const mainLoc = tenant.locations.find((l) => l.isMain);
+  const [locationId, setLocationId] = useState<string>(mainLoc?.id ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const q = query.toLowerCase();
+  const filtered = devices.filter((d) =>
+    d.devEUI.toLowerCase().includes(q) ||
+    d.name.toLowerCase().includes(q) ||
+    d.model.toLowerCase().includes(q)
+  );
+  const picked = devices.find((d) => d.devEUI === pickedEui);
+
+  function submit() {
+    if (!picked) return;
+    setError(null);
+    start(async () => {
+      try {
+        await assignDeviceToTenantAction({
+          tenantId: tenant.id,
+          devEui: picked.devEUI,
+          name: picked.name,
+          model: picked.model,
+          applicationId: picked.applicationId ?? undefined,
+          locationId: locationId || null,
+        });
+        router.refresh();
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error");
+      }
+    });
+  }
+
+  return (
+    <div className={m.backdrop} onClick={onClose}>
+      <div className={m.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className={m.modalHeader}>
+          <div className={m.modalTitle}>
+            <Plus size={16} /> {t ? "Προσθήκη Συσκευής" : "Add Device"} · {tenant.name}
+          </div>
+          <button onClick={onClose} className={m.modalClose}><X size={18} /></button>
+        </div>
+        <div className={m.modalBody}>
+          {error && <div className={`${m.alert} ${m.alertError}`} style={{ marginBottom: 12 }}><AlertCircle size={16} /> {error}</div>}
+          {devices.length === 0 ? (
+            <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: 12 }}>
+              {t ? "Δεν υπάρχουν μη αντιστοιχισμένες συσκευές στο Milesight." : "No unassigned Milesight devices available."}
+            </div>
+          ) : (
+            <>
+              <div style={{ position: "relative", marginBottom: 10 }}>
+                <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                <input
+                  className="input"
+                  style={{ paddingLeft: 32 }}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t ? "Αναζήτηση DevEUI/όνομα/μοντέλο..." : "Search DevEUI/name/model..."}
+                />
+              </div>
+              {tenant.locations.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <label className="label">{t ? "Τοποθεσία" : "Location"}</label>
+                  <select
+                    className="input"
+                    value={locationId}
+                    onChange={(e) => setLocationId(e.target.value)}
+                  >
+                    <option value="">{t ? "— καμία —" : "— none —"}</option>
+                    {tenant.locations.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.isMain ? "★ " : ""}{l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div style={{ maxHeight: 280, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
+                {filtered.map((d) => (
+                  <button
+                    key={d.devEUI}
+                    type="button"
+                    onClick={() => setPickedEui(d.devEUI)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%",
+                      padding: "10px 12px", border: "none", cursor: "pointer",
+                      background: pickedEui === d.devEUI ? "var(--orange-dim)" : "transparent",
+                      color: pickedEui === d.devEUI ? "var(--orange)" : "var(--text-primary)",
+                      textAlign: "left", fontSize: "0.85rem",
+                      borderBottom: "1px solid var(--row-border)",
+                    }}
+                  >
+                    {pickedEui === d.devEUI && <Check size={14} />}
+                    <span style={{ fontWeight: 600, minWidth: 120 }}>{d.name}</span>
+                    <code style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "var(--text-muted)" }}>{d.devEUI}</code>
+                    <span style={{ flex: 1 }} />
+                    <span className="badge badge-gray">{d.model}</span>
+                    <span className={`badge ${d.connectStatus === "ONLINE" ? "badge-green" : "badge-gray"}`}>{d.connectStatus}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <div className={m.saveBar}>
+            <button type="button" disabled={!picked || pending} onClick={submit} className={`btn-primary ${m.saveBtn}`}>
+              {pending ? <Loader2 size={16} className={m.spin} /> : <Save size={16} />}
+              {t ? "Αντιστοίχιση" : "Assign"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditUserModal({
+  user, tenantName, onClose, t,
+}: {
+  user: UserLite;
+  tenantName: string;
+  onClose: () => void;
+  t: boolean;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(user.name);
+  const [role, setRole] = useState<"CUSTOMER" | "OPERATOR" | "VIEWER">(user.role as "CUSTOMER" | "OPERATOR" | "VIEWER");
+  const [isActive, setIsActive] = useState(user.isActive);
+  const [error, setError] = useState<string | null>(null);
+  const [resetPwd, setResetPwd] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, start] = useTransition();
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    start(async () => {
+      try {
+        await updateTenantUserAction({ userId: user.id, name, role, isActive });
+        router.refresh();
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error");
+      }
+    });
+  }
+
+  function resetPassword() {
+    if (!confirm(t ? "Επαναφορά κωδικού χρήστη;" : "Reset password?")) return;
+    setError(null);
+    start(async () => {
+      try {
+        const res = await resetTenantUserPasswordAction(user.id);
+        setResetPwd(res.tempPassword);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error");
+      }
+    });
+  }
+
+  function del() {
+    if (!confirm(`${t ? "Διαγραφή χρήστη" : "Delete user"} "${user.email}";`)) return;
+    setError(null);
+    start(async () => {
+      try {
+        await deleteTenantUserAction(user.id);
+        router.refresh();
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error");
+      }
+    });
+  }
+
+  function copy(s: string) {
+    navigator.clipboard.writeText(s);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className={m.backdrop} onClick={onClose}>
+      <div className={m.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className={m.modalHeader}>
+          <div className={m.modalTitle}>
+            <UserRound size={16} /> {user.name} · {tenantName}
+          </div>
+          <button onClick={onClose} className={m.modalClose}><X size={18} /></button>
+        </div>
+        <div className={m.modalBody}>
+          {error && (
+            <div className={`${m.alert} ${m.alertError}`} style={{ marginBottom: 12 }}>
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
+
+          {resetPwd && (
+            <div style={{ marginBottom: 16, padding: 12, background: "var(--bg-elevated)", border: "1px solid var(--orange)", borderRadius: 6 }}>
+              <div style={{ fontSize: "0.72rem", color: "var(--orange)", fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>
+                {t ? "Νέος κωδικός — δώστε τον μια φορά" : "New password — shown once"}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <code style={{ flex: 1, fontFamily: "monospace", fontSize: "1.05rem", fontWeight: 700, color: "var(--text-primary)", background: "var(--bg-card)", padding: "8px 12px", borderRadius: 6 }}>
+                  {resetPwd}
+                </code>
+                <button type="button" onClick={() => copy(resetPwd)} className="btn-secondary" style={{ padding: "8px 12px" }}>
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                </button>
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {tab === "kads" && (
-        <div style={{ padding: 24 }}>
-          {kadCount === 0 ? (
-            <div className={s.emptyCell}>{t ? "Δεν υπάρχουν ΚΑΔ" : "No KAD entries"}</div>
-          ) : (
-            <div className={s.kadList}>
-              {c.kads.map((k) => (
-                <div key={k.id} className={s.kadRow}>
-                  <code className={s.kadCode}>{k.kadCode}</code>
-                  <span className={s.kadDesc}>{k.kadDescription}</span>
-                  <span className={`badge ${k.kadType === "1" ? "badge-orange" : "badge-gray"}`}>
-                    {k.kadType === "1" ? (t ? "Κύρια" : "Primary") : (t ? "Δευτ." : "Secondary")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === "devices" && (
-        <div style={{ padding: 24 }}>
-          {devCount === 0 ? (
-            <div className={s.emptyCell}>
-              {t
-                ? "Δεν υπάρχουν συσκευές. Αντιστοιχίστε από το /admin/devices."
-                : "No devices yet. Assign from /admin/devices."}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {c.devices!.map((d) => (
-                <div
-                  key={d.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                    background: "var(--bg-card)", border: "1px solid var(--border)",
-                    borderRadius: "var(--radius)", fontSize: "0.875rem",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: d.online ? "var(--green)" : "var(--text-muted)",
-                      flexShrink: 0,
-                    }}
+          <form onSubmit={save} className={m.form}>
+            <div className={m.grid4}>
+              <div className={`${m.field} ${m.span4}`}>
+                <label className="label">{t ? "Ονοματεπώνυμο" : "Full name"}</label>
+                <input className="input" required value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className={`${m.field} ${m.span4}`}>
+                <label className="label">Email</label>
+                <input className="input" value={user.email} disabled />
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Ρόλος" : "Role"}</label>
+                <select className="input" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="OPERATOR">Operator</option>
+                  <option value="VIEWER">Viewer</option>
+                </select>
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className={m.checkboxRow} style={{ marginTop: 20 }}>
+                  <input
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
                   />
-                  <span style={{ fontWeight: 600, color: "var(--text-primary)", minWidth: 120 }}>{d.name}</span>
-                  <code style={{ fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "0.78rem" }}>
-                    {d.devEui}
-                  </code>
-                  {d.model && <span className="badge badge-gray">{d.model}</span>}
-                  <span style={{ flex: 1 }} />
-                  {typeof d.battery === "number" && (
-                    <span style={{ color: "var(--text-secondary)", fontSize: "0.78rem" }}>
-                      🔋 {d.battery}%
-                    </span>
-                  )}
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
-                    {d.lastSeenAt
-                      ? formatDate(d.lastSeenAt, t ? "el-GR" : "en-GB")
-                      : (t ? "Ποτέ" : "Never")}
-                  </span>
-                </div>
-              ))}
+                  {t ? "Ενεργός" : "Active"}
+                </label>
+              </div>
             </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "space-between", padding: "14px 0", borderTop: "1px solid var(--border)", marginTop: 8 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={resetPassword}
+                  disabled={pending}
+                  className="btn-secondary"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}
+                >
+                  <KeyRound size={14} /> {t ? "Επαναφορά κωδικού" : "Reset password"}
+                </button>
+                <button
+                  type="button"
+                  onClick={del}
+                  disabled={pending}
+                  className="btn-secondary"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--red)" }}
+                >
+                  <Trash2 size={14} /> {t ? "Διαγραφή" : "Delete"}
+                </button>
+              </div>
+              <button type="submit" disabled={pending} className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {pending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {t ? "Αποθήκευση" : "Save"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddUserModal({ tenant, onClose, t }: { tenant: Tenant; onClose: () => void; t: boolean }) {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<"CUSTOMER" | "OPERATOR" | "VIEWER">("CUSTOMER");
+  const [password, setPassword] = useState("");
+  const [receiveAlerts, setReceiveAlerts] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<CreateTenantUserResult | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, start] = useTransition();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    start(async () => {
+      try {
+        const res = await createTenantUserAction({
+          tenantId: tenant.id, email, name, role,
+          password: password || undefined,
+          receiveAlerts,
+        });
+        setResult(res);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error");
+      }
+    });
+  }
+
+  function copy() {
+    if (!result) return;
+    navigator.clipboard.writeText(result.tempPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className={m.backdrop} onClick={onClose}>
+      <div className={m.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className={m.modalHeader}>
+          <div className={m.modalTitle}>
+            <UserPlus size={16} /> {t ? "Νέος Χρήστης" : "New User"} · {tenant.name}
+          </div>
+          <button onClick={onClose} className={m.modalClose}><X size={18} /></button>
+        </div>
+        <div className={m.modalBody}>
+          {result ? (
+            <>
+              <div className={`${m.alert} ${m.alertSuccess}`}>
+                <CheckCircle2 size={16} /> {t ? "Δημιουργήθηκε" : "Created"}
+              </div>
+              <div style={{ marginTop: 14, padding: 12, background: "var(--bg-elevated)", borderRadius: 6 }}>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 4 }}>{t ? "Email" : "Email"}</div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{result.email}</div>
+              </div>
+              <div style={{ marginTop: 10, padding: 12, background: "var(--bg-elevated)", borderRadius: 6, border: "1px solid var(--orange)" }}>
+                <div style={{ fontSize: "0.72rem", color: "var(--orange)", marginBottom: 4, fontWeight: 700 }}>
+                  {t ? "Προσωρινός κωδικός — δώστε τον μια φορά" : "Temporary password — shown once"}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <code style={{
+                    flex: 1, fontFamily: "monospace", fontSize: "1.05rem", fontWeight: 700,
+                    color: "var(--text-primary)", background: "var(--bg-card)",
+                    padding: "8px 12px", borderRadius: 6,
+                  }}>
+                    {result.tempPassword}
+                  </code>
+                  <button type="button" onClick={copy} className="btn-secondary" style={{ padding: "8px 12px" }}>
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div className={m.saveBar}>
+                <button type="button" className="btn-primary" onClick={onClose}>
+                  {t ? "Κλείσιμο" : "Close"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <form onSubmit={submit} className={m.form}>
+              {error && <div className={`${m.alert} ${m.alertError}`}><AlertCircle size={16} /> {error}</div>}
+              <div className={m.grid4}>
+                <div className={`${m.field} ${m.span4}`}>
+                  <label className="label">{t ? "Ονοματεπώνυμο" : "Full name"}</label>
+                  <input className="input" required value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className={`${m.field} ${m.span4}`}>
+                  <label className="label">Email</label>
+                  <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className={`${m.field} ${m.span2}`}>
+                  <label className="label">{t ? "Ρόλος" : "Role"}</label>
+                  <select className="input" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+                    <option value="CUSTOMER">Customer (admin του tenant)</option>
+                    <option value="OPERATOR">Operator</option>
+                    <option value="VIEWER">Viewer</option>
+                  </select>
+                </div>
+                <div className={`${m.field} ${m.span2}`}>
+                  <label className="label">{t ? "Κωδικός (προαιρετικό)" : "Password (optional)"}</label>
+                  <input
+                    className="input"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t ? "αυτόματη παραγωγή" : "auto-generate"}
+                  />
+                </div>
+                <label className={`${m.checkboxRow} ${m.span4}`}>
+                  <input
+                    type="checkbox"
+                    checked={receiveAlerts}
+                    onChange={(e) => setReceiveAlerts(e.target.checked)}
+                  />
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    🔔 {t ? "Λήψη ειδοποιήσεων συσκευών" : "Receive device alerts"}
+                  </span>
+                </label>
+              </div>
+              <div className={m.saveBar}>
+                <button type="submit" disabled={pending} className={`btn-primary ${m.saveBtn}`}>
+                  {pending ? <Loader2 size={16} className={m.spin} /> : <Save size={16} />}
+                  {t ? "Δημιουργία" : "Create"}
+                </button>
+              </div>
+            </form>
           )}
         </div>
-      )}
-    </div>
-  );
-}
-
-function DetailTab({
-  active, onClick, count, children,
-}: {
-  active: boolean; onClick: () => void; count?: number; children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "8px 14px",
-        background: "transparent",
-        border: "none",
-        borderBottom: active ? "2px solid var(--orange)" : "2px solid transparent",
-        color: active ? "var(--orange)" : "var(--text-secondary)",
-        cursor: "pointer",
-        fontWeight: 600,
-        fontSize: "0.8rem",
-        marginBottom: -1,
-        display: "flex", alignItems: "center", gap: 6,
-      }}
-    >
-      {children}
-      {count !== undefined && (
-        <span className={`badge ${active ? "badge-orange" : "badge-gray"}`} style={{ fontSize: "0.65rem" }}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className={s.detailGroup}>
-      <div className={s.detailGroupTitle}>{title}</div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className={s.detailRow}>
-      <span className={s.detailLabel}>{label}</span>
-      <span className={s.detailValue}>{value || "—"}</span>
+      </div>
     </div>
   );
 }

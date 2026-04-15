@@ -40,3 +40,6 @@ next-env.d.ts
 # prisma
 prisma/*.db
 prisma/*.db-journal
+
+# SoftOne cached session token (per-instance, never commit)
+.s1session.json

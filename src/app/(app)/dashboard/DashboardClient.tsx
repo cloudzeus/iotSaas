@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FiCpu, FiWifi, FiBell, FiDollarSign, FiMapPin } from "react-icons/fi";
 import DashboardGrid from "@/components/widgets/DashboardGrid";
 import type { DashboardSection, WidgetType, WidgetConfig } from "@/components/widgets/types";
 import { createDashboard, renameDashboard, deleteDashboard } from "@/lib/dashboard-actions";
@@ -48,23 +49,33 @@ interface Stats {
   pricePerDevice: number;
 }
 
+interface LocationTab { id: string; name: string; isMain: boolean; }
+
 interface DashboardClientProps {
   dashboards: DashboardData[];
   devices: DeviceWithChannels[];
   stats: Stats;
   locale: string;
+  locations?: LocationTab[];
+  activeLocationId?: string;
+  /**
+   * Base path the location tabs link to. The location id is appended as
+   * `?loc=<id>` (or `&loc=<id>` if a query already exists).
+   * e.g. `/admin/tenants/abc123/dashboard`
+   */
+  locationHrefBase?: string;
 }
 
 // ── KPI card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  icon,
+  Icon,
   label,
   value,
   color = "#ff6600",
   sub,
 }: {
-  icon: string;
+  Icon: React.ComponentType<{ size?: number }>;
   label: string;
   value: string | number;
   color?: string;
@@ -73,27 +84,45 @@ function KpiCard({
   return (
     <div
       className="card"
-      style={{ padding: "14px 18px", minWidth: 140, position: "relative", overflow: "hidden" }}
+      style={{
+        padding: "16px 18px",
+        minWidth: 160,
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flex: "1 1 160px",
+      }}
     >
       <div
         style={{
           position: "absolute",
-          top: 0,
-          right: 0,
-          width: 60,
-          height: 60,
-          background: `radial-gradient(circle, ${color}20, transparent 70%)`,
+          top: 0, right: 0,
+          width: 80, height: 80,
+          background: `radial-gradient(circle, ${color}22, transparent 70%)`,
           pointerEvents: "none",
         }}
       />
-      <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
       <div
-        style={{ fontSize: 24, fontWeight: 800, color, fontVariantNumeric: "tabular-nums" }}
+        style={{
+          width: 42, height: 42, borderRadius: 10,
+          background: `${color}18`,
+          color,
+          display: "inline-flex",
+          alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}
       >
-        {value}
+        <Icon size={20} />
       </div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{label}</div>
-      {sub && <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub}</div>}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
+          {value}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub}</div>}
+      </div>
     </div>
   );
 }
@@ -105,6 +134,9 @@ export default function DashboardClient({
   devices,
   stats,
   locale,
+  locations,
+  activeLocationId,
+  locationHrefBase,
 }: DashboardClientProps) {
   const [dashboards, setDashboards] = useState<DashboardData[]>(initialDashboards);
   const [activeDashboardId, setActiveDashboardId] = useState<string>(
@@ -153,6 +185,74 @@ export default function DashboardClient({
 
   return (
     <div style={{ padding: "20px 24px", maxWidth: 1600 }}>
+      {/* ── Location tabs (if this dashboard has location context) ─────────── */}
+      {locations && locations.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 16,
+            padding: "10px 14px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            overflowX: "auto",
+          }}
+        >
+          <FiMapPin size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+          <span
+            style={{
+              fontSize: "0.7rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--text-muted)",
+              fontWeight: 700,
+              flexShrink: 0,
+              marginRight: 4,
+            }}
+          >
+            {locale === "el" ? "Τοποθεσία" : "Location"}
+          </span>
+          {locations.map((l) => {
+            const active = l.id === activeLocationId;
+            const href = locationHrefBase
+              ? `${locationHrefBase}${locationHrefBase.includes("?") ? "&" : "?"}loc=${l.id}`
+              : undefined;
+            const baseStyle: React.CSSProperties = {
+              padding: "6px 14px",
+              borderRadius: 999,
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              textDecoration: "none",
+              background: active ? "var(--orange)" : "var(--bg-card)",
+              color: active ? "white" : "var(--text-secondary)",
+              border: "1px solid " + (active ? "var(--orange)" : "var(--border)"),
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            };
+            const content = (
+              <>
+                {l.isMain && <span style={{ color: active ? "white" : "var(--orange)" }}>★</span>}
+                {l.name}
+              </>
+            );
+            return href ? (
+              <a key={l.id} href={href} style={baseStyle}>
+                {content}
+              </a>
+            ) : (
+              <span key={l.id} style={baseStyle}>
+                {content}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── KPI strip ──────────────────────────────────────────────────────── */}
       <div
         style={{
@@ -163,26 +263,26 @@ export default function DashboardClient({
         }}
       >
         <KpiCard
-          icon="🖥️"
+          Icon={FiCpu}
           label="Total devices"
           value={stats.totalDevices}
           color="#ff6600"
         />
         <KpiCard
-          icon="✅"
+          Icon={FiWifi}
           label="Online now"
           value={stats.onlineDevices}
           color="#22c55e"
           sub={`${stats.totalDevices > 0 ? Math.round((stats.onlineDevices / stats.totalDevices) * 100) : 0}% uptime`}
         />
         <KpiCard
-          icon="🔔"
+          Icon={FiBell}
           label="Active alerts"
           value={stats.activeAlerts}
           color={stats.activeAlerts > 0 ? "#ef4444" : "#22c55e"}
         />
         <KpiCard
-          icon="💶"
+          Icon={FiDollarSign}
           label="Est. this month"
           value={`€${stats.estimatedBill.toFixed(2)}`}
           color="#a855f7"

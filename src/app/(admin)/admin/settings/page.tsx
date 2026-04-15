@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import SoftoneStatus from "@/components/softone/SoftoneStatus";
+import MailgunStatus from "@/components/settings/MailgunStatus";
 
 export const metadata = { title: "Admin Settings" };
 
@@ -8,20 +10,35 @@ export default async function AdminSettingsPage() {
   if (!session) redirect("/login");
   if (session.user.role !== "SUPER_ADMIN") redirect("/admin/overview");
 
+  const t = session.user.locale === "el";
+
   return (
-    <div style={{ maxWidth: "640px" }}>
+    <div style={{ maxWidth: 720 }}>
       <div className="page-header">
         <h1 className="page-title">
-          {session.user.locale === "el" ? "Ρυθμίσεις Συστήματος" : "System Settings"}
+          {t ? "Ρυθμίσεις Συστήματος" : "System Settings"}
         </h1>
       </div>
-      <div className="card" style={{ padding: "24px" }}>
-        <p style={{ color: "var(--text-secondary)" }}>
-          {session.user.locale === "el"
-            ? "Ρυθμίσεις διαχειριστή — διαθέσιμες στην επόμενη έκδοση."
-            : "Admin system settings — available in the next release."}
-        </p>
-      </div>
+
+      <section style={{ marginBottom: 24 }}>
+        <h2 style={{
+          fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em",
+          fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10,
+        }}>
+          {t ? "Ενσωματώσεις" : "Integrations"}
+        </h2>
+        <SoftoneStatus locale={session.user.locale} />
+      </section>
+
+      <section style={{ marginBottom: 24 }}>
+        <h2 style={{
+          fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em",
+          fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10,
+        }}>
+          {t ? "Email" : "Email"}
+        </h2>
+        <MailgunStatus locale={session.user.locale} defaultTo={session.user.email ?? ""} />
+      </section>
     </div>
   );
 }

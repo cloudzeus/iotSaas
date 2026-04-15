@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-const publicPaths = ["/login", "/api/auth", "/api/health", "/api/milesight/webhook", "/api/viva/webhook"];
+const publicPaths = ["/login", "/api/auth", "/api/health", "/api/cron", "/api/milesight/webhook", "/api/viva/webhook"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;

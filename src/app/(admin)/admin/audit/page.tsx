@@ -18,5 +18,8 @@ export default async function AuditPage() {
     },
   });
 
-  return <AuditClient logs={JSON.parse(JSON.stringify(logs))} locale={session.user.locale} />;
+  const serialized = JSON.parse(
+    JSON.stringify(logs, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
+  );
+  return <AuditClient logs={serialized} locale={session.user.locale} />;
 }

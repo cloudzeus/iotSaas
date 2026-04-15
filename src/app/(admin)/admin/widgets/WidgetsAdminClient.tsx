@@ -3,8 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LayoutGrid, Plus, Pencil, Trash2, X, Save, Loader2, AlertCircle,
-} from "lucide-react";
+  FiLayers, FiPlus, FiEdit2, FiTrash2, FiX, FiSave, FiLoader, FiAlertCircle,
+} from "react-icons/fi";
+
+const LayoutGrid = FiLayers;
+const Plus = FiPlus;
+const Pencil = FiEdit2;
+const Trash2 = FiTrash2;
+const X = FiX;
+const Save = FiSave;
+const Loader2 = FiLoader;
+const AlertCircle = FiAlertCircle;
 import {
   saveWidgetTypeAction, deleteWidgetTypeAction, toggleTenantWidgetAction,
   type WidgetTypeInput,

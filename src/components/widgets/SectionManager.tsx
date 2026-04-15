@@ -38,10 +38,12 @@ function SortableSection({
   section,
   onRename,
   onDelete,
+  onColsChange,
 }: {
   section: DashboardSection;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onColsChange: (id: string, cols: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(section.name);
@@ -119,6 +121,38 @@ function SortableSection({
         <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{section.name}</span>
       )}
 
+      {/* Columns selector */}
+      <label
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 11,
+          color: "var(--text-muted)",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+        title="Widgets per row on desktop (auto on mobile)"
+      >
+        Cols
+        <select
+          value={section.cols ?? 3}
+          onChange={(e) => onColsChange(section.id, Number(e.target.value))}
+          style={{
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+            borderRadius: 4,
+            padding: "3px 6px",
+            fontSize: 12,
+          }}
+        >
+          {[1, 2, 3, 4, 6].map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </label>
+
       {/* Actions */}
       <button
         className="btn-ghost"
@@ -126,7 +160,7 @@ function SortableSection({
         onClick={() => setEditing(true)}
         title="Rename"
       >
-        ✏️
+        ✎
       </button>
       <button
         className="btn-ghost"
@@ -134,7 +168,7 @@ function SortableSection({
         onClick={() => onDelete(section.id)}
         title="Delete section"
       >
-        🗑
+        ×
       </button>
     </div>
   );
@@ -191,6 +225,12 @@ export default function SectionManager({
     await updateSection(dashboardId, id, { name });
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
     onChange(sections.map((s) => (s.id === id ? { ...s, name } : s)));
+  }
+
+  async function handleColsChange(id: string, cols: number) {
+    await updateSection(dashboardId, id, { cols });
+    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, cols } : s)));
+    onChange(sections.map((s) => (s.id === id ? { ...s, cols } : s)));
   }
 
   async function handleDelete(id: string) {
@@ -276,6 +316,7 @@ export default function SectionManager({
                   section={s}
                   onRename={handleRename}
                   onDelete={handleDelete}
+                  onColsChange={handleColsChange}
                 />
               ))}
             </SortableContext>
