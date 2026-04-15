@@ -301,6 +301,31 @@ export async function fetchAllTrdpGroups(): Promise<S1TrdpGroup[]> {
   }).then((rows) => rows.filter((g) => g.trdpgroup > 0 && g.name));
 }
 
+// ─── Trader business groups (TRDBUSINESS) ───────────────────────────────────
+
+export interface S1TrdBusiness {
+  trdbusiness: number;
+  company: number;
+  sodtype: number;
+  name: string;
+  code: string | null;
+}
+
+export async function fetchAllTrdBusinesses(): Promise<S1TrdBusiness[]> {
+  return s1GetTable<S1TrdBusiness>({
+    table: "Trdbusiness",
+    fields: "Trdbusiness",
+    filter: "sodtype=13",
+    mapRow: (r) => ({
+      trdbusiness: Number(r.trdbusiness ?? r.TRDBUSINESS ?? 0),
+      company:     Number(r.company     ?? r.COMPANY     ?? 0),
+      sodtype:     Number(r.sodtype     ?? r.SODTYPE     ?? 0),
+      name:        String(r.name ?? r.NAME ?? ""),
+      code:        r.code ? String(r.code) : null,
+    }),
+  }).then((rows) => rows.filter((b) => b.trdbusiness > 0 && b.name));
+}
+
 /** Fetch customers touched in [since, until]. */
 export async function fetchCustomersByDateRange(
   since: Date,

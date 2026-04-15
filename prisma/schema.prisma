@@ -452,6 +452,21 @@ model TrdpGroup {
   @@map("trdp_groups")
 }
 
+model TrdBusiness {
+  id          Int      @id @default(autoincrement())
+  trdbusiness Int      @unique
+  company     Int
+  sodtype     Int
+  name        String   @db.VarChar(200)
+  code        String?  @db.VarChar(30)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([company, sodtype])
+  @@map("trd_businesses")
+}
+
 // ─── Sync schedule (super-admin configurable) ────────────────────────────────
 
 model SyncSchedule {

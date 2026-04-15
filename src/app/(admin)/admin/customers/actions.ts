@@ -43,6 +43,8 @@ export interface CustomerUpdateInput {
   consent?: boolean;
   remark?: string | null;
   isprosp?: number;
+  trdpgroup?: number | null;
+  trdbusiness?: number | null;
 }
 
 export async function updateCustomerAction(input: CustomerUpdateInput): Promise<void> {

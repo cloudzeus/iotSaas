@@ -5,9 +5,11 @@ import {
   fetchCustomersByDateRange,
   fetchAllCountries,
   fetchAllTrdpGroups,
+  fetchAllTrdBusinesses,
   type S1Customer,
   type S1Country,
   type S1TrdpGroup,
+  type S1TrdBusiness,
 } from "@/lib/softone";
 
 async function findExistingCustomer(c: S1Customer) {
@@ -252,5 +254,54 @@ export async function syncSoftoneTrdpGroups(
   return recordJob("softone-trdpgroups", trigger, {}, async () => {
     const rows = await fetchAllTrdpGroups();
     return runUpsertTrdpGroups(rows);
+  });
+}
+
+// ─── Trader business groups ──────────────────────────────────────────────────
+
+async function runUpsertTrdBusinesses(rows: S1TrdBusiness[]): Promise<SyncResult> {
+  const start = Date.now();
+  let created = 0, updated = 0, skipped = 0;
+  const errors: SyncResult["errors"] = [];
+  for (const b of rows) {
+    try {
+      const data = {
+        trdbusiness: b.trdbusiness,
+        company: b.company,
+        sodtype: b.sodtype,
+        name: b.name,
+        code: b.code,
+      };
+      const existing = await db.trdBusiness.findUnique({ where: { trdbusiness: b.trdbusiness } });
+      if (existing) {
+        await db.trdBusiness.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await db.trdBusiness.create({ data });
+        created++;
+      }
+    } catch (err) {
+      errors.push({
+        identifier: `trdbusiness=${b.trdbusiness}`,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      skipped++;
+    }
+  }
+  return {
+    scanned: rows.length,
+    created, updated, skipped, errors,
+    since: "ALL",
+    until: new Date().toISOString(),
+    durationMs: Date.now() - start,
+  };
+}
+
+export async function syncSoftoneTrdBusinesses(
+  trigger: "manual" | "cron" | "api" = "manual"
+) {
+  return recordJob("softone-trdbusinesses", trigger, {}, async () => {
+    const rows = await fetchAllTrdBusinesses();
+    return runUpsertTrdBusinesses(rows);
   });
 }

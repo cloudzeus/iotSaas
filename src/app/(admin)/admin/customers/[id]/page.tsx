@@ -23,7 +23,7 @@ export default async function CustomerDetailPage({ params }: Params) {
   const customerId = Number(id);
   if (isNaN(customerId)) notFound();
 
-  const [customer, countries, trdpGroups] = await Promise.all([
+  const [customer, countries, trdpGroups, trdBusinesses] = await Promise.all([
     db.customer.findUnique({
       where: { id: customerId },
       include: {
@@ -41,6 +41,7 @@ export default async function CustomerDetailPage({ params }: Params) {
     }),
     db.country.findMany({ select: { country: true, name: true, shortcut: true }, orderBy: { name: "asc" } }),
     db.trdpGroup.findMany({ select: { trdpgroup: true, name: true }, orderBy: { name: "asc" } }),
+    db.trdBusiness.findMany({ select: { trdbusiness: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   if (!customer) notFound();
 
@@ -50,6 +51,9 @@ export default async function CustomerDetailPage({ params }: Params) {
     : null;
   const trdpGroupName = customer.trdpgroup
     ? trdpGroups.find((g) => g.trdpgroup === customer.trdpgroup)?.name ?? String(customer.trdpgroup)
+    : null;
+  const trdBusinessName = customer.trdbusiness
+    ? trdBusinesses.find((b) => b.trdbusiness === customer.trdbusiness)?.name ?? String(customer.trdbusiness)
     : null;
 
   return (
@@ -84,6 +88,7 @@ export default async function CustomerDetailPage({ params }: Params) {
             customer={JSON.parse(JSON.stringify(customer))}
             countries={countries}
             trdpGroups={trdpGroups}
+            trdBusinesses={trdBusinesses}
             locale={session.user.locale}
           />
         </div>
@@ -130,7 +135,7 @@ export default async function CustomerDetailPage({ params }: Params) {
         <DetailCard icon={<FiBriefcase size={14} />} title="Softone">
           <Row label={t ? "Επάγγελμα" : "Job type"} value={customer.jobtypetrd || customer.jobtype} />
           <Row label={t ? "Ομάδα (Trdpgroup)" : "Price group"} value={trdpGroupName} />
-          <Row label="Trdbusiness" value={customer.trdbusiness} />
+          <Row label={t ? "Επιχείρηση (Trdbusiness)" : "Business group"} value={trdBusinessName} />
           <Row label={t ? "Έργα (prjcs)" : "Projects"} value={customer.prjcs} />
           <Row label={t ? "Δημιουργήθηκε" : "Created"} value={new Date(customer.createdAt).toLocaleString("el-GR")} />
           <Row label={t ? "Ενημερώθηκε" : "Updated"} value={new Date(customer.updatedAt).toLocaleString("el-GR")} />

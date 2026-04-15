@@ -32,17 +32,20 @@ interface Customer {
   remark: string | null;
   isprosp: number;
   trdpgroup: number | null;
+  trdbusiness: number | null;
 }
 
 interface CountryOpt { country: number; name: string; shortcut: string | null; }
 interface TrdpGroupOpt { trdpgroup: number; name: string; }
+interface TrdBusinessOpt { trdbusiness: number; name: string; }
 
 export default function CustomerEditor({
-  customer, countries, trdpGroups, locale,
+  customer, countries, trdpGroups, trdBusinesses, locale,
 }: {
   customer: Customer;
   countries: CountryOpt[];
   trdpGroups: TrdpGroupOpt[];
+  trdBusinesses: TrdBusinessOpt[];
   locale: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -63,6 +66,7 @@ export default function CustomerEditor({
           customer={customer}
           countries={countries}
           trdpGroups={trdpGroups}
+          trdBusinesses={trdBusinesses}
           onClose={() => setOpen(false)}
           t={t}
         />
@@ -72,11 +76,12 @@ export default function CustomerEditor({
 }
 
 function EditorModal({
-  customer, countries, trdpGroups, onClose, t,
+  customer, countries, trdpGroups, trdBusinesses, onClose, t,
 }: {
   customer: Customer;
   countries: CountryOpt[];
   trdpGroups: TrdpGroupOpt[];
+  trdBusinesses: TrdBusinessOpt[];
   onClose: () => void;
   t: boolean;
 }) {
@@ -116,6 +121,7 @@ function EditorModal({
       remark: f.remark,
       isprosp: f.isprosp,
       trdpgroup: f.trdpgroup,
+      trdbusiness: f.trdbusiness,
     };
     start(async () => {
       try {
@@ -186,7 +192,7 @@ function EditorModal({
             </Section>
 
             <Section title="Softone">
-              <div className={`${m.field} ${m.span4}`}>
+              <div className={`${m.field} ${m.span2}`}>
                 <label className="label">{t ? "Ομάδα πελατών (TRDPGROUP)" : "Customer price group"}</label>
                 <select
                   className="input"
@@ -196,6 +202,19 @@ function EditorModal({
                   <option value="">— {t ? "επιλέξτε" : "select"} —</option>
                   {trdpGroups.map((g) => (
                     <option key={g.trdpgroup} value={g.trdpgroup}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={`${m.field} ${m.span2}`}>
+                <label className="label">{t ? "Επιχείρηση (TRDBUSINESS)" : "Business group"}</label>
+                <select
+                  className="input"
+                  value={f.trdbusiness != null ? String(f.trdbusiness) : ""}
+                  onChange={(e) => set("trdbusiness", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— {t ? "επιλέξτε" : "select"} —</option>
+                  {trdBusinesses.map((b) => (
+                    <option key={b.trdbusiness} value={b.trdbusiness}>{b.name}</option>
                   ))}
                 </select>
               </div>
