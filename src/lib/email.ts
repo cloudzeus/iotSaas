@@ -241,6 +241,69 @@ export async function sendPaymentConfirmedEmail(opts: {
   });
 }
 
+export async function sendProformaInvoiceEmail(opts: {
+  to: string;
+  tenantName: string;
+  invoiceId: string;
+  periodLabel: string;    // e.g. "Νοέμβριος 2026"
+  deviceCount: number;
+  pricePerDevice: number;
+  subtotal: number;
+  vat: number;
+  total: number;
+  graceUntil?: Date | null;
+  paymentUrl?: string | null;
+  locale?: "el" | "en";
+}) {
+  const isGr = opts.locale === "el";
+  const fmtMoney = (n: number) => `€${n.toFixed(2)}`;
+  const lineItemsRow = `
+    <tr>
+      <td style="padding:10px;border-top:1px solid #e5e7eb">${opts.deviceCount}× ${isGr ? "συσκευές" : "devices"} @ ${fmtMoney(opts.pricePerDevice)}</td>
+      <td style="padding:10px;border-top:1px solid #e5e7eb;text-align:right">${fmtMoney(opts.subtotal)}</td>
+    </tr>`;
+  const body = `
+    <p>${isGr ? `Προφόρμα για τον λογαριασμό` : "Proforma invoice for"} <strong>${opts.tenantName}</strong>:</p>
+    <table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:14px">
+      <tr>
+        <th style="text-align:left;padding:10px;background:#f8fafc;color:#6b7280;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${isGr ? "Περιγραφή" : "Description"}</th>
+        <th style="text-align:right;padding:10px;background:#f8fafc;color:#6b7280;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${isGr ? "Ποσό" : "Amount"}</th>
+      </tr>
+      ${lineItemsRow}
+      <tr>
+        <td style="padding:10px;color:#6b7280">${isGr ? "Περίοδος" : "Period"}</td>
+        <td style="padding:10px;text-align:right;color:#6b7280">${opts.periodLabel}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;color:#6b7280">${isGr ? "ΦΠΑ 24%" : "VAT 24%"}</td>
+        <td style="padding:10px;text-align:right;color:#6b7280">${fmtMoney(opts.vat)}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 10px;border-top:2px solid #0b0b0e;font-weight:700;font-size:16px">${isGr ? "Σύνολο προς πληρωμή" : "Total due"}</td>
+        <td style="padding:12px 10px;border-top:2px solid #0b0b0e;text-align:right;font-weight:800;font-size:18px;color:#ff6600">${fmtMoney(opts.total)}</td>
+      </tr>
+    </table>
+    ${opts.graceUntil ? `
+      <div style="background:#fff7ed;border:1px solid #ff6600;border-radius:8px;padding:12px;margin:14px 0;font-size:13px">
+        ${isGr ? "Περίοδος χάριτος πληρωμής έως" : "Grace period for payment until"}: <strong>${opts.graceUntil.toLocaleDateString(isGr ? "el-GR" : "en-GB")}</strong>
+      </div>
+    ` : ""}
+    <p style="color:#6b7280;font-size:12px">${isGr ? "Αρ. Τιμολογίου" : "Invoice"}: <code>${opts.invoiceId}</code></p>
+  `;
+
+  return mgSend({
+    to: opts.to,
+    subject: `${isGr ? "Προφόρμα" : "Proforma"} · ${opts.tenantName} · ${opts.periodLabel}`,
+    html: layout(
+      isGr ? "Προφόρμα Τιμολόγιο" : "Proforma Invoice",
+      body,
+      opts.paymentUrl ?? undefined,
+      opts.paymentUrl ? (isGr ? "Πληρωμή τώρα" : "Pay now") : undefined,
+    ),
+    tags: ["invoice-proforma"],
+  });
+}
+
 export async function sendPaymentFailedEmail(opts: {
   to: string;
   tenantName: string;

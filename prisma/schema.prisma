@@ -346,6 +346,7 @@ model Invoice {
   status         InvoiceStatus @default(DRAFT)
   vivaOrderCode  String?       @db.VarChar(100)
   paidAt         DateTime?
+  graceUntil     DateTime?
   lineItems      Json
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

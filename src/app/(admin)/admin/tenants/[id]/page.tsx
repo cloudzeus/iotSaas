@@ -6,6 +6,7 @@ import {
   FiArrowLeft, FiBriefcase, FiMapPin, FiGrid, FiCpu, FiUser,
   FiDollarSign, FiFileText, FiExternalLink,
 } from "react-icons/fi";
+import InvoiceRow from "@/components/billing/InvoiceRow";
 
 export const metadata = { title: "Tenant" };
 
@@ -27,6 +28,11 @@ export default async function TenantOverviewPage({ params }: Params) {
       locations: {
         orderBy: [{ isMain: "desc" }, { name: "asc" }],
         select: { id: true, name: true, isMain: true, city: true, _count: { select: { devices: true } } },
+      },
+      invoices: {
+        where: { status: { in: ["DRAFT", "PENDING", "OVERDUE"] } },
+        orderBy: { periodStart: "desc" },
+        take: 6,
       },
       _count: { select: { devices: true, users: true, dashboards: true, invoices: true, locations: true, alertRules: true } },
     },
@@ -83,6 +89,39 @@ export default async function TenantOverviewPage({ params }: Params) {
             desc={tenant.customer.name} />
         )}
       </div>
+
+      {/* Unpaid invoices */}
+      {tenant.invoices.length > 0 && (
+        <section style={{ marginBottom: 20 }}>
+          <h2 style={{
+            fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em",
+            fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10,
+          }}>
+            {t ? "Εκκρεμή Τιμολόγια" : "Unpaid Invoices"} ({tenant.invoices.length})
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {tenant.invoices.map((inv) => (
+              <InvoiceRow
+                key={inv.id}
+                invoice={{
+                  id: inv.id,
+                  tenantId: tenant.id,
+                  tenantName: tenant.name,
+                  billingEmail: tenant.billingEmail,
+                  periodStart: inv.periodStart.toISOString(),
+                  deviceCount: inv.deviceCount,
+                  total: Number(inv.total),
+                  status: inv.status,
+                  graceUntil: inv.graceUntil ? inv.graceUntil.toISOString() : null,
+                  vivaOrderCode: inv.vivaOrderCode,
+                  createdAt: inv.createdAt.toISOString(),
+                }}
+                locale={session.user.locale}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Overview panels */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
