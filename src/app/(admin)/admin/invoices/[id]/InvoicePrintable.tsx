@@ -1,6 +1,10 @@
 "use client";
 
-import { FiPrinter } from "react-icons/fi";
+import { useState, useTransition } from "react";
+import {
+  FiPrinter, FiMail, FiSend, FiLoader, FiCheckCircle, FiAlertCircle, FiCreditCard,
+} from "react-icons/fi";
+import { sendProformaToCustomEmailAction } from "@/app/(admin)/admin/billing/actions";
 
 interface LineItem {
   deviceId?: string;
@@ -71,6 +75,7 @@ interface Props {
 
 export default function InvoicePrintable({ invoice, countries, vendor, locale }: Props) {
   const t = locale === "el";
+  const [emailOpen, setEmailOpen] = useState(false);
   const fmtMoney = (n: number | string) =>
     `€${Number(n).toLocaleString(t ? "el-GR" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtDate = (d: string | Date) =>
@@ -367,33 +372,198 @@ export default function InvoicePrintable({ invoice, countries, vendor, locale }:
           © {new Date().getFullYear()} {vendor.vendor}
         </div>
 
-        {/* Print button (only visible on screen) */}
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="no-print"
-          style={{
-            position: "fixed",
-            bottom: 24, right: 24,
-            background: "#ff6600",
-            color: "#fff",
-            border: "none",
-            borderRadius: 999,
-            padding: "10px 18px",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            boxShadow: "0 8px 20px rgba(255,102,0,0.4)",
-            zIndex: 100,
-          }}
-        >
-          <FiPrinter size={14} /> {t ? "Εκτύπωση" : "Print"}
-        </button>
+        {/* Floating action buttons (only visible on screen) */}
+        <div className="no-print" style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 10, zIndex: 100 }}>
+          <button
+            type="button"
+            onClick={() => setEmailOpen(true)}
+            style={{
+              background: "#fff",
+              color: "#ff6600",
+              border: "2px solid #ff6600",
+              borderRadius: 999,
+              padding: "10px 18px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+            }}
+          >
+            <FiMail size={14} /> {t ? "Αποστολή Email" : "Send email"}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            style={{
+              background: "#ff6600",
+              color: "#fff",
+              border: "none",
+              borderRadius: 999,
+              padding: "10px 18px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              boxShadow: "0 8px 20px rgba(255,102,0,0.4)",
+            }}
+          >
+            <FiPrinter size={14} /> {t ? "Εκτύπωση" : "Print"}
+          </button>
+        </div>
       </div>
+
+      {emailOpen && (
+        <SendEmailModal
+          invoiceId={invoice.id}
+          defaultEmail={invoice.tenant.billingEmail ?? c.email ?? ""}
+          hasViva={!!invoice.vivaOrderCode}
+          onClose={() => setEmailOpen(false)}
+          t={t}
+        />
+      )}
     </>
+  );
+}
+
+function SendEmailModal({
+  invoiceId, defaultEmail, hasViva, onClose, t,
+}: {
+  invoiceId: string;
+  defaultEmail: string;
+  hasViva: boolean;
+  onClose: () => void;
+  t: boolean;
+}) {
+  const [to, setTo] = useState(defaultEmail);
+  const [withPayment, setWithPayment] = useState(hasViva);
+  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null);
+  const [pending, start] = useTransition();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setResult(null);
+    start(async () => {
+      const r = await sendProformaToCustomEmailAction({
+        invoiceId,
+        to,
+        withPaymentLink: withPayment,
+      });
+      if (r.ok) {
+        setResult({ ok: true, text: t ? "Στάλθηκε" : "Sent", url: r.paymentUrl ?? undefined });
+      } else {
+        setResult({ ok: false, text: r.error ?? "Error" });
+      }
+    });
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1500,
+        background: "rgba(0,0,0,0.55)",
+        backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "40px 16px", overflowY: "auto",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff", color: "#111",
+          width: "100%", maxWidth: 480,
+          borderRadius: 12, overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        }}
+      >
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+            <FiMail size={16} />
+            {t ? "Αποστολή Προφόρμας" : "Send Proforma"}
+          </div>
+          <button
+            type="button" onClick={onClose}
+            style={{ background: "transparent", border: "none", color: "#6b7280", fontSize: 20, cursor: "pointer", padding: 4 }}
+          >×</button>
+        </div>
+        <form onSubmit={submit} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.05 }}>
+              {t ? "Παραλήπτης" : "Recipient email"}
+            </label>
+            <input
+              type="email" required
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              style={{
+                width: "100%", padding: "8px 10px",
+                border: "1px solid #d1d5db", borderRadius: 6,
+                fontSize: 14, color: "#111",
+              }}
+              placeholder="name@example.com"
+            />
+          </div>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 10px", background: "#fff7ed", border: "1px solid #fdba74",
+            borderRadius: 6, fontSize: 13, color: "#9a3412", cursor: "pointer",
+          }}>
+            <input
+              type="checkbox"
+              checked={withPayment}
+              onChange={(e) => setWithPayment(e.target.checked)}
+              style={{ accentColor: "#ff6600" }}
+            />
+            <FiCreditCard size={13} />
+            {t ? "Συμπερίληψη Viva link πληρωμής" : "Include Viva payment link"}
+          </label>
+
+          {result && (
+            <div style={{
+              padding: 10, borderRadius: 6, fontSize: 13,
+              background: result.ok ? "#f0fdf4" : "#fef2f2",
+              color: result.ok ? "#166534" : "#991b1b",
+              display: "flex", alignItems: "center", gap: 8, wordBreak: "break-all",
+            }}>
+              {result.ok ? <FiCheckCircle size={14} /> : <FiAlertCircle size={14} />}
+              {result.text}
+              {result.url && <span style={{ fontSize: 11, opacity: 0.8 }}>· {result.url}</span>}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f3f4f6" }}>
+            <button
+              type="button" onClick={onClose}
+              style={{
+                background: "transparent", border: "1px solid #d1d5db",
+                color: "#4b5563", padding: "8px 14px", borderRadius: 6, cursor: "pointer",
+                fontSize: 13, fontWeight: 600,
+              }}
+            >
+              {t ? "Κλείσιμο" : "Close"}
+            </button>
+            <button
+              type="submit" disabled={pending}
+              style={{
+                background: "#ff6600", color: "#fff",
+                border: "none", padding: "8px 16px", borderRadius: 6,
+                cursor: pending ? "not-allowed" : "pointer",
+                fontSize: 13, fontWeight: 700,
+                display: "inline-flex", alignItems: "center", gap: 6,
+              }}
+            >
+              {pending ? <FiLoader size={13} className="animate-spin" /> : <FiSend size={13} />}
+              {t ? "Αποστολή" : "Send"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
