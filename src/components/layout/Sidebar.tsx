@@ -7,6 +7,7 @@ import {
   FiGrid, FiCpu, FiBell, FiCreditCard, FiSettings,
   FiHelpCircle, FiLogOut, FiChevronLeft, FiChevronRight,
   FiUsers, FiBookOpen, FiBarChart2, FiShield, FiLayers, FiArchive,
+  FiDollarSign,
 } from "react-icons/fi";
 import LicenseButton from "./LicenseButton";
 
@@ -78,6 +79,7 @@ export default function Sidebar({ collapsed, onToggle, role, locale }: SidebarPr
     { href: "/admin/tenants", icon: Users, label: t ? "SaaS Tenants" : "Tenants" },
     { href: "/admin/devices", icon: Cpu, label: t ? "Συσκευές" : "Devices" },
     { href: "/admin/widgets", icon: LayoutGrid, label: t ? "Widgets" : "Widgets" },
+    { href: "/admin/accounting", icon: FiDollarSign, label: t ? "Λογιστήριο" : "Accounting" },
     { href: "/admin/plans", icon: BookOpen, label: t ? "Πλάνα" : "Plans" },
     { href: "/admin/users", icon: Users, label: t ? "Χρήστες" : "Users" },
     { href: "/admin/roles", icon: Shield, label: t ? "Ρόλοι" : "Roles" },
