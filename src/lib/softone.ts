@@ -111,12 +111,18 @@ export interface S1Customer {
   city: string | null;
   district: string | null;
   area: string | null;
+  country: number | null;
   phone01: string | null;
   phone02: string | null;
   email: string | null;
+  emailacc: string | null;
   webpage: string | null;
+  jobtype: number | null;
   jobtypetrd: string | null;
-  irsdata: string | null;
+  trdpgroup: number | null;
+  trdbusiness: number | null;
+  isprosp: number | null;
+  prjcs: number | null;
   insdate: Date | null;
   upddate: Date | null;
 }
@@ -305,11 +311,18 @@ function mapBrowserRowToCustomer(r: Record<string, unknown>): S1Customer {
     city:       get("city"),
     district:   null,
     area:       null,
+    country:    num("country"),
     phone01:    get("phone01"),
     phone02:    get("phone02"),
     email:      get("email"),
+    emailacc:   get("emailacc"),
     webpage:    get("webpage"),
-    jobtypetrd: get("jobtype"),
+    jobtype:    num("jobtype"),
+    jobtypetrd: null,
+    trdpgroup:  num("trdpgroup"),
+    trdbusiness:num("trdbusiness"),
+    isprosp:    num("isprosp"),
+    prjcs:      num("prjcs"),
     irsdata:    get("irsdata"),
     insdate:    date("insdate"),
     upddate:    date("upddate"),

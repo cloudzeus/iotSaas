@@ -20,6 +20,46 @@ function slugify(s: string) {
     .slice(0, 80) || `tenant-${Date.now()}`;
 }
 
+export interface CustomerUpdateInput {
+  id: number;
+  name?: string;
+  code?: string | null;
+  afm?: string | null;
+  sotitle?: string | null;
+  irsdata?: string | null;
+  address?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  district?: string | null;
+  area?: string | null;
+  country?: number | null;
+  phone01?: string | null;
+  phone02?: string | null;
+  email?: string | null;
+  emailacc?: string | null;
+  webpage?: string | null;
+  gemiCode?: string | null;
+  numberOfEmployees?: number | null;
+  consent?: boolean;
+  remark?: string | null;
+  isprosp?: number;
+}
+
+export async function updateCustomerAction(input: CustomerUpdateInput): Promise<void> {
+  await requireAdmin();
+  const data: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (k === "id") continue;
+    if (v === undefined) continue;
+    data[k] = typeof v === "string" ? v.trim() || null : v;
+  }
+  if (data.name === null || data.name === "") throw new Error("Το όνομα είναι υποχρεωτικό");
+
+  await db.customer.update({ where: { id: input.id }, data });
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${input.id}`);
+}
+
 export async function promoteToTenantAction(input: {
   customerId: number;
   planId?: string;

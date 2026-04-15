@@ -6,6 +6,7 @@ import {
   FiArrowLeft, FiMapPin, FiMail, FiPhone, FiGlobe, FiHash,
   FiHome, FiBriefcase, FiUsers, FiLink as FiLinkIcon, FiStar,
 } from "react-icons/fi";
+import CustomerEditor from "./CustomerEditor";
 
 export const metadata = { title: "Customer" };
 
@@ -63,17 +64,24 @@ export default async function CustomerDetailPage({ params }: Params) {
           <FiHome size={20} style={{ display: "inline", marginRight: 8, color: "var(--orange)" }} />
           {customer.name}
         </h1>
-        {customer.tenant ? (
-          <Link
-            href={`/admin/tenants`}
-            className="badge badge-green"
-            style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
-          >
-            <FiLinkIcon size={11} /> {t ? "Συνδεδεμένος Tenant" : "Linked Tenant"}
-          </Link>
-        ) : (
-          <span className="badge badge-gray">{t ? "CRM μόνο" : "CRM only"}</span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {customer.tenant ? (
+            <Link
+              href={`/admin/tenants`}
+              className="badge badge-green"
+              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <FiLinkIcon size={11} /> {t ? "Συνδεδεμένος Tenant" : "Linked Tenant"}
+            </Link>
+          ) : (
+            <span className="badge badge-gray">{t ? "CRM μόνο" : "CRM only"}</span>
+          )}
+          <CustomerEditor
+            customer={JSON.parse(JSON.stringify(customer))}
+            countries={countries}
+            locale={session.user.locale}
+          />
+        </div>
       </div>
 
       {customer.sotitle && (
